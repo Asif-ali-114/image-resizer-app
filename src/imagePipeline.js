@@ -1,8 +1,5 @@
-import resize from "@jsquash/resize";
-import { encode as encodeJpeg } from "@jsquash/jpeg";
-import { encode as encodePng } from "@jsquash/png";
-import { encode as encodeWebp } from "@jsquash/webp";
 import ImageProcessorWorker from "./imageProcessor.worker.js?worker";
+import { bisectQuality } from "./utils/bisect.js";
 
 const SMALL_IMAGE_PIXEL_LIMIT = 1_600_000;
 const WORKER_IMAGE_PIXEL_LIMIT = 2_500_000;
@@ -15,6 +12,42 @@ const FORMAT_MIME = {
 };
 
 let workerPool = null;
+let _resize;
+let _encodeJpeg;
+let _encodePng;
+let _encodeWebp;
+
+async function getResize() {
+  if (!_resize) {
+    const mod = await import("@jsquash/resize");
+    _resize = mod.default;
+  }
+  return _resize;
+}
+
+async function getJpegEncoder() {
+  if (!_encodeJpeg) {
+    const mod = await import("@jsquash/jpeg");
+    _encodeJpeg = mod.encode;
+  }
+  return _encodeJpeg;
+}
+
+async function getPngEncoder() {
+  if (!_encodePng) {
+    const mod = await import("@jsquash/png");
+    _encodePng = mod.encode;
+  }
+  return _encodePng;
+}
+
+async function getWebpEncoder() {
+  if (!_encodeWebp) {
+    const mod = await import("@jsquash/webp");
+    _encodeWebp = mod.encode;
+  }
+  return _encodeWebp;
+}
 
 function supportsWorkers() {
   return typeof Worker !== "undefined";
@@ -127,12 +160,12 @@ async function encodeCanvas(canvas, format, quality) {
 async function encodeImageData(imageData, format, quality) {
   switch (format) {
     case "PNG":
-      return await encodePng(imageData);
+      return await (await getPngEncoder())(imageData);
     case "WebP":
-      return await encodeWebp(imageData, { quality });
+      return await (await getWebpEncoder())(imageData, { quality });
     case "JPG":
     default:
-      return await encodeJpeg(imageData, { quality, progressive: true, optimize_coding: true, auto_subsample: true });
+      return await (await getJpegEncoder())(imageData, { quality, progressive: true, optimize_coding: true, auto_subsample: true });
   }
 }
 
@@ -187,22 +220,12 @@ async function processOnMainThread({ file, settings, crop, sourceWidth, sourceHe
 
     let blob;
     if (settings.sizeMode === "target" && settings.format !== "PNG") {
-      let low = 10;
-      let high = 100;
-      let best = null;
-      for (let i = 0; i < 8; i += 1) {
-        const mid = Math.round((low + high) / 2);
-        const candidate = await encodeCanvas(finalCanvas, settings.format, mid);
-        const candidateKB = candidate.size / 1024;
-        if (candidateKB > settings.targetKB) {
-          high = Math.max(10, mid - 1);
-        } else {
-          best = candidate;
-          low = Math.min(100, mid + 1);
-        }
-        onProgress?.({ stage: "Refining size", progress: 80 + (i + 1) * 2 });
+      const best = await bisectQuality(async (q) => {
+        const candidate = await encodeCanvas(finalCanvas, settings.format, q);
+        onProgress?.({ stage: "Refining size", progress: Math.min(98, 80 + Math.round((q / 100) * 16)) });
         await new Promise((resolve) => requestAnimationFrame(resolve));
-      }
+        return candidate;
+      }, settings.targetKB, 8);
       blob = best || (await encodeCanvas(finalCanvas, settings.format, settings.quality));
     } else {
       blob = await encodeCanvas(finalCanvas, settings.format, settings.quality);

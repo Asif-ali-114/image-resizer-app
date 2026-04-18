@@ -196,6 +196,7 @@ async function processTask(taskId, payload) {
   let buffer;
   if (resizedImageData) {
     if (settings.sizeMode === "target" && settings.format !== "PNG") {
+      // TODO: deduplicate when worker ESM imports are fully supported
       let low = 10;
       let high = 100;
       let best = null;
@@ -216,6 +217,7 @@ async function processTask(taskId, payload) {
     }
   } else {
     if (settings.sizeMode === "target" && settings.format !== "PNG") {
+      // TODO: deduplicate when worker ESM imports are fully supported
       let low = 10;
       let high = 100;
       let best = null;
