@@ -1,0 +1,151 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --color-surface: 250 244 255;
+  --color-background: 250 244 255;
+  --color-on-surface: 48 41 80;
+  --color-on-background: 48 41 80;
+  --color-on-surface-variant: 94 86 128;
+  --color-surface-container: 236 228 255;
+  --color-surface-container-low: 244 238 255;
+  --color-surface-container-high: 230 222 255;
+  --color-surface-container-lowest: 255 255 255;
+  --color-primary: 70 71 211;
+  --color-primary-dim: 57 57 199;
+  --color-primary-container: 147 150 255;
+  --color-on-primary: 244 241 255;
+  --color-secondary-container: 255 193 214;
+  --color-on-secondary-container: 142 0 84;
+  --color-outline: 121 113 157;
+  --color-outline-variant: 176 167 214;
+  --color-error: 180 19 64;
+  --color-warn: 125 102 8;
+
+  --c-navy: #1f4e79;
+  --c-blue: #2e75b6;
+  --c-lb: #d0e4f7;
+  --c-accent: #e8f4fc;
+  --c-text: #1a1a1a;
+  --c-muted: #555555;
+  --c-bg: #f7fbff;
+  --c-success: #375623;
+  --c-warn: #7d6608;
+  --c-danger: #9c0006;
+  --c-white: #ffffff;
+  --c-gray: #f2f2f2;
+  --c-success-card-bg: #eaf7ef;
+  --c-success-card-border: #c0ddb5;
+}
+
+.dark {
+  color-scheme: dark;
+
+  --color-surface: 15 19 32;
+  --color-background: 15 19 32;
+  --color-on-surface: 242 245 255;
+  --color-on-background: 242 245 255;
+  --color-on-surface-variant: 196 204 223;
+  --color-surface-container: 35 44 66;
+  --color-surface-container-low: 29 36 54;
+  --color-surface-container-high: 42 50 72;
+  --color-surface-container-lowest: 23 28 43;
+  --color-primary: 139 167 255;
+  --color-primary-dim: 113 140 245;
+  --color-primary-container: 95 121 214;
+  --color-on-primary: 14 21 48;
+  --color-secondary-container: 56 64 103;
+  --color-on-secondary-container: 221 229 255;
+  --color-outline: 94 107 138;
+  --color-outline-variant: 63 75 105;
+  --color-error: 255 127 152;
+  --color-warn: 245 201 107;
+
+  --c-navy: #dbe7ff;
+  --c-blue: #8bb0ff;
+  --c-lb: #344467;
+  --c-accent: #2a3553;
+  --c-text: #eef2ff;
+  --c-muted: #b9c5e0;
+  --c-bg: #1b2337;
+  --c-success: #95e0a4;
+  --c-warn: #f5cd76;
+  --c-danger: #ff9aa8;
+  --c-white: #24304a;
+  --c-gray: #161d2d;
+  --c-success-card-bg: #1b2c24;
+  --c-success-card-border: #3f6d58;
+}
+
+/* Global Styles */
+html {
+  @apply scroll-smooth;
+}
+
+body {
+  @apply antialiased bg-surface text-on-surface overflow-x-hidden transition-colors duration-200;
+}
+
+* {
+  @apply box-border;
+}
+
+/* Typography */
+h1, h2, h3, h4, h5, h6 {
+  @apply font-headline;
+}
+
+/* Form Elements */
+input[type="text"],
+input[type="number"],
+input[type="email"],
+input[type="password"],
+textarea,
+select {
+  @apply w-full px-4 py-2.5 rounded-lg border border-outline-variant/40 bg-surface-container-lowest text-on-surface font-body transition-all duration-200;
+  @apply focus:border-primary focus:ring-2 focus:ring-primary/20 focus:outline-none;
+  @apply disabled:opacity-50 disabled:cursor-not-allowed;
+  @apply placeholder:text-on-surface-variant/50;
+}
+
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+input[type="number"] {
+  -moz-appearance: textfield;
+}
+
+input[type="range"] {
+  @apply w-full h-1.5 bg-surface-container rounded-lg appearance-none cursor-pointer accent-primary;
+  @apply focus:outline-none focus:ring-2 focus:ring-primary/20;
+}
+
+input[type="range"]::-webkit-slider-thumb {
+  @apply appearance-none w-5 h-5 bg-primary rounded-full cursor-pointer shadow-md hover:shadow-lg transition-shadow;
+}
+
+input[type="range"]::-moz-range-thumb {
+  @apply w-5 h-5 bg-primary rounded-full cursor-pointer shadow-md hover:shadow-lg transition-shadow border-none;
+}
+
+input[type="color"] {
+  @apply w-16 h-12 rounded-lg border border-outline-variant/30 cursor-pointer transition-transform hover:scale-105;
+  @apply focus:outline-none focus:ring-2 focus:ring-primary/20;
+}
+
+/* Checkboxes */
+input[type="checkbox"] {
+  @apply w-5 h-5 rounded accent-primary cursor-pointer;
+}
+
+/* Print Styles */
+@media print {
+  body {
+    @apply bg-white;
+  }
+}
+
