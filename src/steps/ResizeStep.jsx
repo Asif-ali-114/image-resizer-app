@@ -3,6 +3,8 @@ import Btn from "../components/Btn.jsx";
 import Card from "../components/Card.jsx";
 import { PRESETS, ICONS, SIZE_PRESETS } from "../constants/presets.js";
 import { LOCAL_STORAGE_SETTINGS_KEY } from "../constants/formats.js";
+import { sanitizeSettings } from "../utils/sanitizeSettings.js";
+import { isCodecSupported } from "../utils/codecCapabilities.js";
 
 function Sec({ children, icon }) {
   return <h3 className="text-lg font-headline font-bold text-on-surface mb-4 flex items-center gap-2">{icon && <span className="text-xl">{icon}</span>}{children}</h3>;
@@ -28,28 +30,26 @@ function WarnBox({ msg }) {
   );
 }
 
-function sanitizeSettings(raw) {
-  const next = raw && typeof raw === "object" ? raw : {};
-  const quality = Number.isFinite(Number(next.quality)) ? Math.round(Number(next.quality)) : 85;
-  const rawFormat = typeof next.format === "string" ? next.format.toLowerCase() : "jpeg";
-  const normalizedFormat = ["jpeg", "png", "webp"].includes(rawFormat) ? rawFormat : "jpeg";
-  const jpgBackground = typeof next.jpgBackground === "string" && /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(next.jpgBackground)
-    ? next.jpgBackground
-    : "#ffffff";
-
-  return {
-    quality: Math.min(100, Math.max(1, quality)),
-    format: normalizedFormat === "jpeg" ? "JPG" : normalizedFormat === "png" ? "PNG" : "WebP",
-    jpgBackground,
-  };
-}
-
 export default function ResizeStep({ image, onNext, onBack }) {
+  const formatMap = useMemo(() => ({ JPG: "jpeg", PNG: "png", WebP: "webp" }), []);
+  const supportedResizeFormats = useMemo(
+    () => ["JPG", "PNG", "WebP"].filter((entry) => isCodecSupported(formatMap[entry])),
+    [formatMap],
+  );
   const saved = useMemo(() => {
     try {
-      return sanitizeSettings(JSON.parse(localStorage.getItem(LOCAL_STORAGE_SETTINGS_KEY) || "{}"));
+      const normalized = sanitizeSettings(JSON.parse(localStorage.getItem(LOCAL_STORAGE_SETTINGS_KEY) || "{}"));
+      return {
+        quality: normalized.quality,
+        format: normalized.format === "jpeg" ? "JPG" : normalized.format === "png" ? "PNG" : "WebP",
+        jpgBackground: normalized.jpgBackground,
+      };
     } catch {
-      return sanitizeSettings({});
+      return {
+        quality: 85,
+        format: "JPG",
+        jpgBackground: "#ffffff",
+      };
     }
   }, []);
 
@@ -67,6 +67,13 @@ export default function ResizeStep({ image, onNext, onBack }) {
   const [activePreset, setActivePreset] = useState(null);
   const [error, setError] = useState("");
   const [warn, setWarn] = useState("");
+
+  useEffect(() => {
+    if (!supportedResizeFormats.length) return;
+    if (!supportedResizeFormats.includes(format)) {
+      setFormat(supportedResizeFormats[0]);
+    }
+  }, [format, supportedResizeFormats]);
 
   const effW = mode === "percent" ? Math.round((image.w * pct) / 100) : width;
   const effH = mode === "percent" ? Math.round((image.h * pct) / 100) : height;
@@ -190,7 +197,14 @@ export default function ResizeStep({ image, onNext, onBack }) {
           <Sec>🎨 Format & Compression</Sec>
           <div style={{ display: "flex", gap: 6, marginBottom: 12 }}>
             {["JPG", "PNG", "WebP"].map((f) => (
-              <Btn key={f} onClick={() => setFmt(f)} variant={format === f ? "primary" : "ghost"} small>
+              <Btn
+                key={f}
+                onClick={() => setFmt(f)}
+                variant={format === f ? "primary" : "ghost"}
+                small
+                disabled={!supportedResizeFormats.includes(f)}
+                title={supportedResizeFormats.includes(f) ? undefined : "Not supported in this browser"}
+              >
                 {f}
               </Btn>
             ))}

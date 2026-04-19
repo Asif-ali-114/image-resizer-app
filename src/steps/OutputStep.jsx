@@ -1,9 +1,11 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Btn from "../components/Btn.jsx";
 import Card from "../components/Card.jsx";
+import ComparisonSlider from "../components/ComparisonSlider.jsx";
 import { FORMAT_MIME } from "../constants/formats.js";
 import { processSingleImage, downloadBlob } from "../imagePipeline.js";
 import { bytesToText } from "../utils/imageUtils.js";
+import { blobRegistry } from "../utils/BlobRegistry.js";
 
 function Sec({ children, icon }) {
   return <h3 className="text-lg font-headline font-bold text-on-surface mb-4 flex items-center gap-2">{icon && <span className="text-xl">{icon}</span>}{children}</h3>;
@@ -23,31 +25,18 @@ export default function OutputStep({ image, settings, crop, onBack, onReset, onN
   const [procTime, setProcTime] = useState(null);
   const [view, setView] = useState("before");
   const [procError, setProcError] = useState(null);
+  const outputTagRef = useRef(`single-output-${Date.now()}-${Math.random().toString(36).slice(2)}`);
 
-  useEffect(() => {
-    imgRef.current.onload = () => {
-      setImgLoaded(true);
-      drawBefore();
-    };
-    imgRef.current.src = image.url;
-  }, [image.url]);
-
-  useEffect(() => {
-    return () => {
-      if (url) URL.revokeObjectURL(url);
-    };
-  }, [url]);
-
-  const drawBefore = () => {
+  const drawBefore = useCallback(() => {
     const c = canvasRef.current;
     if (!c || !imgRef.current.complete) return;
     const ctx = c.getContext("2d");
     c.width = Math.min(580, image.w);
     c.height = Math.round((c.width * image.h) / image.w);
     ctx.drawImage(imgRef.current, 0, 0, c.width, c.height);
-  };
+  }, [image.w, image.h]);
 
-  const drawAfter = () => {
+  const drawAfter = useCallback(() => {
     if (!url) return;
     const c = canvasRef.current;
     const ctx = c.getContext("2d");
@@ -58,12 +47,27 @@ export default function OutputStep({ image, settings, crop, onBack, onReset, onN
       ctx.drawImage(out, 0, 0, c.width, c.height);
     };
     out.src = url;
-  };
+  }, [url, settings.width, settings.height]);
+
+  useEffect(() => {
+    imgRef.current.onload = () => {
+      setImgLoaded(true);
+      drawBefore();
+    };
+    imgRef.current.src = image.url;
+  }, [image.url, drawBefore]);
+
+  useEffect(() => {
+    const outputTag = outputTagRef.current;
+    return () => {
+      blobRegistry.release(outputTag);
+    };
+  }, []);
 
   useEffect(() => {
     if (view === "before") drawBefore();
     else if (view === "after" && done) drawAfter();
-  }, [view, done, imgLoaded, url]);
+  }, [view, done, imgLoaded, url, drawBefore, drawAfter]);
 
   const process = async () => {
     if (processing) return;
@@ -99,11 +103,15 @@ export default function OutputStep({ image, settings, crop, onBack, onReset, onN
       });
 
       const nextUrl = URL.createObjectURL(result.blob);
+      blobRegistry.replaceUrl(outputTagRef.current, nextUrl);
       setProgress(100);
       setStage("Done");
       setOutBytes(result.bytes);
       setOutputBlob(result.blob);
       setUrl(nextUrl);
+      if (result.warning === "target_size_unreachable") {
+        onNotice?.({ type: "info", message: "Could not reach exact target size — returned closest result." });
+      }
       setProcTime(Math.round(performance.now() - t0));
       setDone(true);
       setView("after");
@@ -159,6 +167,22 @@ export default function OutputStep({ image, settings, crop, onBack, onReset, onN
           </div>
         )}
       </Card>
+
+      {done && url && (
+        <Card>
+          <Sec>↔ Compare</Sec>
+          <ComparisonSlider
+            before={image.url}
+            after={url}
+            beforeLabel="Original"
+            afterLabel="Output"
+            beforeInfo={bytesToText(image.size)}
+            afterInfo={outBytes ? bytesToText(outBytes) : "-"}
+            width="100%"
+            height={280}
+          />
+        </Card>
+      )}
 
       <div>
         <Card style={{ marginBottom: 12 }}>

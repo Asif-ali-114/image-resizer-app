@@ -74,11 +74,20 @@ async function decodeToImageData(file) {
     const buffer = await file.arrayBuffer();
     switch (mime) {
       case "image/jpeg":
-        return await decodeJpeg(buffer).then((imageData) => ({ imageData, width: imageData.width, height: imageData.height }));
+        {
+          const imageData = await decodeJpeg(buffer);
+          return { imageData, width: imageData.width, height: imageData.height };
+        }
       case "image/png":
-        return await decodePng(buffer).then((imageData) => ({ imageData, width: imageData.width, height: imageData.height }));
+        {
+          const imageData = await decodePng(buffer);
+          return { imageData, width: imageData.width, height: imageData.height };
+        }
       case "image/webp":
-        return await decodeWebp(buffer).then((imageData) => ({ imageData, width: imageData.width, height: imageData.height }));
+        {
+          const imageData = await decodeWebp(buffer);
+          return { imageData, width: imageData.width, height: imageData.height };
+        }
       default:
         throw new Error("Worker decode fallback is unavailable for this format.");
     }
@@ -233,9 +242,15 @@ async function processTask(taskId, payload) {
         }
         postMessage({ taskId, type: "progress", progress: { stage: "Refining size", progress: 80 + (i + 1) * 2 } });
       }
-      buffer = best || (await encodeCanvas(resizedCanvas, settings.format, settings.quality).then((blob) => blob.arrayBuffer()));
+      if (best) {
+        buffer = best;
+      } else {
+        const fallbackBlob = await encodeCanvas(resizedCanvas, settings.format, settings.quality);
+        buffer = await fallbackBlob.arrayBuffer();
+      }
     } else {
-      buffer = await encodeCanvas(resizedCanvas, settings.format, settings.quality).then((blob) => blob.arrayBuffer());
+      const encodedBlob = await encodeCanvas(resizedCanvas, settings.format, settings.quality);
+      buffer = await encodedBlob.arrayBuffer();
     }
   }
 

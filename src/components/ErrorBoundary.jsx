@@ -19,7 +19,7 @@ export default class ErrorBoundary extends React.Component {
   render() {
     if (this.state.hasError) {
       return (
-        <div className="min-h-screen flex items-center justify-center p-6 bg-surface">
+        <div className="h-full w-full flex items-center justify-center overflow-hidden p-6 bg-surface">
           <Card className="w-full max-w-xl text-center">
             <h2 className="font-headline text-2xl font-bold text-on-surface mb-3">Something went wrong</h2>
             <code className="block p-3 rounded-lg bg-surface-container text-left text-sm text-on-surface-variant overflow-auto mb-4">

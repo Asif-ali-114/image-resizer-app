@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { validateImageFile } from "../utils/fileValidation.js";
 import { loadImageFromUrl } from "../utils/imageUtils.js";
+import Btn from "../components/Btn.jsx";
+import UrlImportModal from "../components/UrlImportModal.jsx";
+import { blobRegistry } from "../utils/BlobRegistry.js";
 
 function ErrBox({ msg }) {
   if (!msg) return null;
@@ -16,15 +19,18 @@ export default function UploadStep({ onUpload }) {
   const [dragging, setDragging] = useState(false);
   const [error, setError] = useState("");
   const [thumbUrl, setThumbUrl] = useState("");
+  const [urlModalOpen, setUrlModalOpen] = useState(false);
   const inputRef = useRef(null);
+  const previewTagRef = useRef(`upload-preview-${Date.now()}-${Math.random().toString(36).slice(2)}`);
 
   useEffect(() => {
+    const previewTag = previewTagRef.current;
     return () => {
-      if (thumbUrl) URL.revokeObjectURL(thumbUrl);
+      blobRegistry.release(previewTag);
     };
-  }, [thumbUrl]);
+  }, []);
 
-  const processFile = async (file) => {
+  const processFile = useCallback(async (file) => {
     setError("");
     if (!file) {
       if (inputRef.current) inputRef.current.value = "";
@@ -46,7 +52,7 @@ export default function UploadStep({ onUpload }) {
         return;
       }
 
-      if (thumbUrl) URL.revokeObjectURL(thumbUrl);
+      blobRegistry.replaceUrl(previewTagRef.current, url);
       setThumbUrl(url);
       onUpload({ file, url, w: img.width, h: img.height, size: file.size, name: file.name, type: file.type });
     } catch {
@@ -54,7 +60,7 @@ export default function UploadStep({ onUpload }) {
     } finally {
       if (inputRef.current) inputRef.current.value = "";
     }
-  };
+  }, [onUpload]);
 
   const onPaste = useCallback(
     (e) => {
@@ -103,6 +109,18 @@ export default function UploadStep({ onUpload }) {
         <div className="inline-block px-6 py-3 bg-primary text-on-primary rounded-lg font-semibold text-sm hover:bg-primary-dim transition-colors">
           Choose File
         </div>
+        <div className="mt-3">
+          <Btn
+            small
+            variant="secondary"
+            onClick={(event) => {
+              event.stopPropagation();
+              setUrlModalOpen(true);
+            }}
+          >
+            Import from URL
+          </Btn>
+        </div>
         <p className="text-on-surface-variant text-xs md:text-sm mt-6">
           JPG · PNG · WebP · GIF · BMP · TIFF · Max 20MB · Max 8000x8000px
         </p>
@@ -134,6 +152,12 @@ export default function UploadStep({ onUpload }) {
       <div className="mt-6 md:mt-8 p-4 bg-primary/5 border border-primary/20 rounded-lg text-sm text-on-surface-variant">
         <strong className="text-primary">⌨ Shortcuts:</strong> Ctrl+V paste · Tab navigate · Enter confirm
       </div>
+
+      <UrlImportModal
+        open={urlModalOpen}
+        onClose={() => setUrlModalOpen(false)}
+        onAdd={(files) => processFile(files[0])}
+      />
     </div>
   );
 }

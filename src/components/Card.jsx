@@ -1,6 +1,14 @@
 export default function Card({ children, className = "", style }) {
   return (
-    <div className={`bg-surface-container-lowest rounded-xl border border-outline-variant/30 shadow-sm p-6 ${className}`} style={style}>
+    <div
+      className={`rounded-xl border p-6 ${className}`}
+      style={{
+        background: "var(--color-base-0)",
+        borderColor: "var(--color-base-200)",
+        boxShadow: "var(--shadow-sm)",
+        ...style,
+      }}
+    >
       {children}
     </div>
   );

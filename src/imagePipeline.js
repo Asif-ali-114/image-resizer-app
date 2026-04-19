@@ -1,5 +1,5 @@
 import ImageProcessorWorker from "./imageProcessor.worker.js?worker";
-import { bisectQuality } from "./utils/bisect.js";
+import { isCodecSupported } from "./utils/codecCapabilities.js";
 
 const SMALL_IMAGE_PIXEL_LIMIT = 1_600_000;
 const WORKER_IMAGE_PIXEL_LIMIT = 2_500_000;
@@ -12,42 +12,6 @@ const FORMAT_MIME = {
 };
 
 let workerPool = null;
-let _resize;
-let _encodeJpeg;
-let _encodePng;
-let _encodeWebp;
-
-async function getResize() {
-  if (!_resize) {
-    const mod = await import("@jsquash/resize");
-    _resize = mod.default;
-  }
-  return _resize;
-}
-
-async function getJpegEncoder() {
-  if (!_encodeJpeg) {
-    const mod = await import("@jsquash/jpeg");
-    _encodeJpeg = mod.encode;
-  }
-  return _encodeJpeg;
-}
-
-async function getPngEncoder() {
-  if (!_encodePng) {
-    const mod = await import("@jsquash/png");
-    _encodePng = mod.encode;
-  }
-  return _encodePng;
-}
-
-async function getWebpEncoder() {
-  if (!_encodeWebp) {
-    const mod = await import("@jsquash/webp");
-    _encodeWebp = mod.encode;
-  }
-  return _encodeWebp;
-}
 
 function supportsWorkers() {
   return typeof Worker !== "undefined";
@@ -130,19 +94,6 @@ function blobToObjectUrl(blob) {
   return URL.createObjectURL(blob);
 }
 
-function parseFileMime(file) {
-  if (file?.type) return file.type;
-  const ext = file?.name?.split(".").pop()?.toLowerCase();
-  if (ext === "jpg" || ext === "jpeg") return "image/jpeg";
-  if (ext === "png") return "image/png";
-  if (ext === "webp") return "image/webp";
-  if (ext === "gif") return "image/gif";
-  if (ext === "bmp") return "image/bmp";
-  if (ext === "tif" || ext === "tiff") return "image/tiff";
-  return "image/png";
-}
-
-
 function applyJpegBackground(canvas, backgroundColor) {
   const out = createCanvas(canvas.width, canvas.height);
   const ctx = out.getContext("2d");
@@ -153,20 +104,85 @@ function applyJpegBackground(canvas, backgroundColor) {
 }
 
 async function encodeCanvas(canvas, format, quality) {
+  if (!isCodecSupported(format)) {
+    throw new Error(`Codec for ${format} is not available. Cannot encode silently.`);
+  }
   const mime = mimeFromFormat(format);
   return await canvasToBlob(canvas, mime, format === "PNG" ? undefined : quality / 100);
 }
 
-async function encodeImageData(imageData, format, quality) {
-  switch (format) {
-    case "PNG":
-      return await (await getPngEncoder())(imageData);
-    case "WebP":
-      return await (await getWebpEncoder())(imageData, { quality });
-    case "JPG":
-    default:
-      return await (await getJpegEncoder())(imageData, { quality, progressive: true, optimize_coding: true, auto_subsample: true });
+async function encodeToTargetSize({
+  encodeAtQuality,
+  targetKB,
+  initialQuality = 80,
+  maxIterations = 8,
+  epsilon = 0.02,
+}) {
+  const targetSize = Math.max(1, Number(targetKB) || 1) * 1024;
+
+  let quality = Math.max(1, Math.min(100, initialQuality));
+  let bestUnder = null;
+  let lowest = null;
+  let lowQuality = 1;
+  let highQuality = quality;
+
+  while (quality >= 1) {
+    const blob = await encodeAtQuality(quality);
+    const candidate = { quality, blob, size: blob.size };
+
+    if (!lowest || candidate.quality < lowest.quality) {
+      lowest = candidate;
+    }
+
+    if (candidate.size <= targetSize) {
+      bestUnder = candidate;
+      lowQuality = quality;
+      break;
+    }
+
+    highQuality = quality;
+    const next = Math.floor(quality / 2);
+    if (next < 1) break;
+    quality = next;
   }
+
+  if (!bestUnder) {
+    const minBlob = lowest?.blob || (await encodeAtQuality(1));
+    return { blob: minBlob, warning: "target_size_unreachable" };
+  }
+
+  let low = lowQuality;
+  let high = highQuality;
+  let final = bestUnder;
+
+  for (let i = 0; i < maxIterations; i += 1) {
+    if (high - low <= 1) break;
+
+    const mid = Math.max(1, Math.min(100, Math.round((low + high) / 2)));
+    const blob = await encodeAtQuality(mid);
+    const size = blob.size;
+
+    const relError = Math.abs(size - targetSize) / targetSize;
+    if (relError < epsilon) {
+      if (size <= targetSize) {
+        final = { quality: mid, blob, size };
+      }
+      break;
+    }
+
+    if (size > targetSize) {
+      high = mid;
+    } else {
+      low = mid;
+      final = { quality: mid, blob, size };
+    }
+  }
+
+  if (final?.size <= targetSize) {
+    return { blob: final.blob };
+  }
+
+  return { blob: (await encodeAtQuality(1)), warning: "target_size_unreachable" };
 }
 
 async function processOnMainThread({ file, settings, crop, sourceWidth, sourceHeight, sourceUrl, onProgress }) {
@@ -219,14 +235,19 @@ async function processOnMainThread({ file, settings, crop, sourceWidth, sourceHe
     await new Promise((resolve) => requestAnimationFrame(resolve));
 
     let blob;
+    let warning;
     if (settings.sizeMode === "target" && settings.format !== "PNG") {
-      const best = await bisectQuality(async (q) => {
-        const candidate = await encodeCanvas(finalCanvas, settings.format, q);
-        onProgress?.({ stage: "Refining size", progress: Math.min(98, 80 + Math.round((q / 100) * 16)) });
-        await new Promise((resolve) => requestAnimationFrame(resolve));
-        return candidate;
-      }, settings.targetKB, 8);
-      blob = best || (await encodeCanvas(finalCanvas, settings.format, settings.quality));
+      const best = await encodeToTargetSize({
+        encodeAtQuality: async (q) => {
+          const candidate = await encodeCanvas(finalCanvas, settings.format, q);
+          onProgress?.({ stage: "Refining size", progress: Math.min(98, 80 + Math.round((q / 100) * 16)) });
+          await new Promise((resolve) => requestAnimationFrame(resolve));
+          return candidate;
+        },
+        targetKB: settings.targetKB,
+      });
+      blob = best.blob;
+      warning = best.warning;
     } else {
       blob = await encodeCanvas(finalCanvas, settings.format, settings.quality);
     }
@@ -239,6 +260,7 @@ async function processOnMainThread({ file, settings, crop, sourceWidth, sourceHe
       method: "canvas",
         width: targetSize.width,
         height: targetSize.height,
+      warning,
     };
   } finally {
     if (shouldRevoke) URL.revokeObjectURL(transientUrl);
@@ -411,9 +433,9 @@ export async function processBulkImages({ files, settings, onItemProgress, onIte
   if (useWorkers) {
     const pool = getWorkerPool();
     await Promise.all(
-      files.map((file, index) =>
-        pool
-          .schedule(
+      files.map(async (file, index) => {
+        try {
+          const result = await pool.schedule(
             {
               file,
               settings: {
@@ -424,14 +446,12 @@ export async function processBulkImages({ files, settings, onItemProgress, onIte
               },
             },
             (progress) => onItemProgress?.(index, progress),
-          )
-          .then((result) => {
-            onItemResult?.({ index, file, ...result });
-          })
-          .catch((error) => {
-            onItemFail?.({ index, name: file.name, reason: error?.message || "Decode or encode failed" });
-          }),
-      ),
+          );
+          onItemResult?.({ index, file, ...result });
+        } catch (error) {
+          onItemFail?.({ index, name: file.name, reason: error?.message || "Decode or encode failed" });
+        }
+      }),
     );
     return;
   }
@@ -466,4 +486,202 @@ export function downloadBlob(filename, blob) {
   anchor.download = filename;
   anchor.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+const CONVERT_MIME = {
+  jpeg: "image/jpeg",
+  png: "image/png",
+  webp: "image/webp",
+  avif: "image/avif",
+  gif: "image/gif",
+  bmp: "image/bmp",
+  ico: "image/x-icon",
+  tiff: "image/tiff",
+};
+
+const TRANSPARENT_FORMATS = new Set(["png", "webp", "avif", "gif", "ico", "tiff", "svg"]);
+const OPAQUE_FORMATS = new Set(["jpeg", "bmp"]);
+
+let _convertJpegEncode;
+let _convertPngEncode;
+let _convertWebpEncode;
+let _convertAvifEncode;
+
+function normalizeConvertFormat(raw) {
+  const lowered = String(raw || "").toLowerCase();
+  if (lowered === "jpg") return "jpeg";
+  if (lowered === "tif") return "tiff";
+  return lowered;
+}
+
+function sourceFormatFromFile(file) {
+  const fromMime = normalizeConvertFormat(file?.type?.split("/")[1]);
+  if (fromMime) return fromMime;
+  const ext = normalizeConvertFormat(file?.name?.split(".").pop());
+  return ext || "png";
+}
+
+function convertNeedsBackgroundFill(srcFormat, outFormat) {
+  return TRANSPARENT_FORMATS.has(srcFormat) && OPAQUE_FORMATS.has(outFormat);
+}
+
+function createAnyCanvas(width, height) {
+  if (typeof OffscreenCanvas !== "undefined") {
+    return new OffscreenCanvas(width, height);
+  }
+  return createCanvas(width, height);
+}
+
+function context2d(canvas) {
+  return canvas.getContext("2d", { willReadFrequently: true });
+}
+
+async function getConvertJpegEncode() {
+  if (!_convertJpegEncode) {
+    const mod = await import("@jsquash/jpeg");
+    _convertJpegEncode = mod.encode;
+  }
+  return _convertJpegEncode;
+}
+
+async function getConvertPngEncode() {
+  if (!_convertPngEncode) {
+    const mod = await import("@jsquash/png");
+    _convertPngEncode = mod.encode;
+  }
+  return _convertPngEncode;
+}
+
+async function getConvertWebpEncode() {
+  if (!_convertWebpEncode) {
+    const mod = await import("@jsquash/webp");
+    _convertWebpEncode = mod.encode;
+  }
+  return _convertWebpEncode;
+}
+
+async function getConvertAvifEncode() {
+  if (!_convertAvifEncode) {
+    try {
+      const mod = await import(/* @vite-ignore */ "@jsquash/avif");
+      _convertAvifEncode = mod.encode;
+    } catch {
+      _convertAvifEncode = null;
+    }
+  }
+  return _convertAvifEncode;
+}
+
+async function decodeToBitmap(file) {
+  if (typeof createImageBitmap === "function") {
+    try {
+      return await createImageBitmap(file);
+    } catch {
+      // Fallback below for browsers that fail bitmap decoding for a given mime.
+    }
+  }
+
+  const url = URL.createObjectURL(file);
+  try {
+    const image = await new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => resolve(img);
+      img.onerror = () => reject(new Error("Image decode failed"));
+      img.src = url;
+    });
+    return image;
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
+
+async function encodeFromCanvas(canvas, outputFormat, quality) {
+  const fmt = normalizeConvertFormat(outputFormat);
+  if (!isCodecSupported(fmt)) {
+    throw new Error(`Codec for ${fmt} is not available. Cannot encode silently.`);
+  }
+  const mime = CONVERT_MIME[fmt] || "image/png";
+  const q = Math.max(1, Math.min(100, Number(quality) || 85));
+  const ctx = context2d(canvas);
+
+  if (["jpeg", "webp", "avif", "png"].includes(fmt)) {
+    try {
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      if (fmt === "png") {
+        const buffer = await (await getConvertPngEncode())(imageData);
+        return new Blob([buffer], { type: mime });
+      }
+
+      if (fmt === "jpeg") {
+        const buffer = await (await getConvertJpegEncode())(imageData, {
+          quality: q,
+          progressive: true,
+          optimize_coding: true,
+          auto_subsample: true,
+        });
+        return new Blob([buffer], { type: mime });
+      }
+
+      if (fmt === "webp") {
+        const buffer = await (await getConvertWebpEncode())(imageData, { quality: q });
+        return new Blob([buffer], { type: mime });
+      }
+
+      const avifEncode = await getConvertAvifEncode();
+      if (!avifEncode) throw new Error("AVIF codec unavailable");
+      const buffer = await avifEncode(imageData, { quality: q });
+      return new Blob([buffer], { type: mime });
+    } catch {
+      // If a jSquash codec is unavailable in runtime, use canvas blob fallback.
+    }
+  }
+
+  if (fmt === "png" || fmt === "gif" || fmt === "bmp" || fmt === "ico" || fmt === "tiff") {
+    const blob = await canvasToBlob(canvas, mime);
+    if (blob) return blob;
+  }
+
+  const blob = await canvasToBlob(canvas, mime, q / 100);
+  if (blob) return blob;
+  throw new Error("Unable to encode output format in this browser.");
+}
+
+export async function convertImage({
+  file,
+  outputFormat,
+  quality = 85,
+  background = "#ffffff",
+  width,
+  height,
+}) {
+  try {
+    const outFmt = normalizeConvertFormat(outputFormat);
+    const sourceFormat = sourceFormatFromFile(file);
+    const source = await decodeToBitmap(file);
+
+    const targetWidth = Math.max(1, Math.round(Number(width) || source.width));
+    const targetHeight = Math.max(1, Math.round(Number(height) || source.height));
+
+    const canvas = createAnyCanvas(targetWidth, targetHeight);
+    const ctx = context2d(canvas);
+    ctx.clearRect(0, 0, targetWidth, targetHeight);
+
+    if (convertNeedsBackgroundFill(sourceFormat, outFmt)) {
+      ctx.fillStyle = background || "#ffffff";
+      ctx.fillRect(0, 0, targetWidth, targetHeight);
+    }
+
+    ctx.drawImage(source, 0, 0, targetWidth, targetHeight);
+    source.close?.();
+
+    const blob = await encodeFromCanvas(canvas, outFmt, quality);
+    return {
+      blob,
+      outputFormat: outFmt,
+      originalSize: file.size,
+      convertedSize: blob.size,
+    };
+  } catch (err) {
+    return { error: err?.message || "Conversion failed." };
+  }
 }

@@ -1,10 +1,14 @@
-import { useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import JSZip from "jszip";
 import Btn from "../components/Btn.jsx";
 import Card from "../components/Card.jsx";
+import DragHandle from "../components/DragHandle.jsx";
+import UrlImportModal from "../components/UrlImportModal.jsx";
 import { validateImageFile } from "../utils/fileValidation.js";
 import { bytesToText } from "../utils/imageUtils.js";
 import { processBulkImages } from "../imagePipeline.js";
+import useDragToReorder from "../hooks/useDragToReorder.js";
+import { isCodecSupported } from "../utils/codecCapabilities.js";
 
 function Sec({ children, icon }) {
   return <h3 className="text-lg font-headline font-bold text-on-surface mb-4 flex items-center gap-2">{icon && <span className="text-xl">{icon}</span>}{children}</h3>;
@@ -22,12 +26,25 @@ export default function BulkTab({ onNotice }) {
   const [progMap, setProgMap] = useState({});
   const [failed, setFailed] = useState([]);
   const [results, setResults] = useState([]);
+  const [urlOpen, setUrlOpen] = useState(false);
   const inputRef = useRef(null);
   const MAX = 20;
   const orderedResults = useMemo(() => [...results].sort((a, b) => a.index - b.index), [results]);
   const orderedFailed = useMemo(() => [...failed].sort((a, b) => (a.index ?? 0) - (b.index ?? 0)), [failed]);
+  const dragApi = useDragToReorder({ items: files, onReorder: setFiles });
+  const supportedFormats = useMemo(
+    () => ["JPG", "PNG", "WebP"].filter((entry) => isCodecSupported(entry.toLowerCase() === "jpg" ? "jpeg" : entry.toLowerCase())),
+    [],
+  );
 
-  const addFiles = async (list) => {
+  useEffect(() => {
+    if (!supportedFormats.length) return;
+    if (!supportedFormats.includes(format)) {
+      setFormat(supportedFormats[0]);
+    }
+  }, [format, supportedFormats]);
+
+  const addFiles = useCallback(async (list) => {
     const all = Array.from(list || []);
     const checked = [];
 
@@ -52,9 +69,9 @@ export default function BulkTab({ onNotice }) {
     setProgMap({});
     setFailed([...validationFails, ...overLimit]);
     setResults([]);
-  };
+  }, [MAX, onNotice]);
 
-  const processAll = async () => {
+  const processAll = useCallback(async () => {
     setProcessing(true);
     setResults([]);
     setFailed([]);
@@ -96,7 +113,37 @@ export default function BulkTab({ onNotice }) {
     } finally {
       setProcessing(false);
     }
-  };
+  }, [files, format, height, pct, quality, scaleMode, width]);
+
+  const clearQueue = useCallback(() => {
+    files.forEach((f) => {
+      if (f?.objectUrl) URL.revokeObjectURL(f.objectUrl);
+    });
+    setFiles([]);
+    setProgMap({});
+    setFailed([]);
+    setResults([]);
+  }, [files]);
+
+  useEffect(() => {
+    const onShortcut = (event) => {
+      if (event?.detail?.action === "bulk-process-start") {
+        event.preventDefault?.();
+        if (!processing && files.length) {
+          void processAll();
+        }
+      }
+      if (event?.detail?.action === "bulk-clear") {
+        event.preventDefault?.();
+        clearQueue();
+      }
+    };
+
+    window.addEventListener("imagetools:shortcut", onShortcut);
+    return () => {
+      window.removeEventListener("imagetools:shortcut", onShortcut);
+    };
+  }, [clearQueue, files.length, processAll, processing]);
 
   const downloadAll = async () => {
     if (!results.length) return;
@@ -143,6 +190,9 @@ export default function BulkTab({ onNotice }) {
         </p>
         <p style={{ margin: "5px 0 0", color: "var(--c-muted)", fontSize: 12 }}>JPG · PNG · WebP · GIF · Max 200MB total</p>
         <input ref={inputRef} type="file" multiple accept="image/*" style={{ display: "none" }} onChange={(e) => addFiles(e.target.files)} />
+        <div style={{ marginTop: 10, display: "flex", justifyContent: "center" }}>
+          <Btn small variant="secondary" onClick={(e) => { e.stopPropagation(); setUrlOpen(true); }} aria-label="Import images from URL">Import from URL</Btn>
+        </div>
       </div>
 
       <Card style={{ marginBottom: 18 }}>
@@ -180,7 +230,7 @@ export default function BulkTab({ onNotice }) {
             <label style={{ fontSize: 11, color: "var(--c-muted)", display: "block", marginBottom: 4 }}>Format</label>
             <select value={format} onChange={(e) => setFormat(e.target.value)} style={{ padding: "7px 9px", border: "1px solid var(--c-blue)", borderRadius: 6 }}>
               {["JPG", "PNG", "WebP"].map((f) => (
-                <option key={f}>{f}</option>
+                <option key={f} disabled={!supportedFormats.includes(f)} title={!supportedFormats.includes(f) ? "Not supported in this browser" : undefined}>{f}</option>
               ))}
             </select>
           </div>
@@ -200,15 +250,7 @@ export default function BulkTab({ onNotice }) {
               📋 Files ({files.length}/{MAX}) · {(files.reduce((s, f) => s + f.size, 0) / 1024 / 1024).toFixed(1)} MB
             </Sec>
             <Btn
-              onClick={() => {
-                files.forEach((f) => {
-                  if (f?.objectUrl) URL.revokeObjectURL(f.objectUrl);
-                });
-                setFiles([]);
-                setProgMap({});
-                setFailed([]);
-                setResults([]);
-              }}
+              onClick={clearQueue}
               variant="ghost"
               small
             >
@@ -216,7 +258,16 @@ export default function BulkTab({ onNotice }) {
             </Btn>
           </div>
           {files.map((f, i) => (
-            <div key={`${f.name}-${i}`} style={{ display: "flex", alignItems: "center", gap: 10, padding: "7px 0", borderBottom: "1px solid var(--c-accent)" }}>
+            <div
+              key={`${f.name}-${i}`}
+              draggable
+              onDragStart={() => dragApi.dragHandlers.onDragStart(i)}
+              onDragOver={(e) => dragApi.dragHandlers.onDragOver(e, i)}
+              onDrop={() => dragApi.dragHandlers.onDrop(i)}
+              onDragEnd={dragApi.dragHandlers.onDragEnd}
+              style={{ display: "flex", alignItems: "center", gap: 10, padding: "7px 0", borderBottom: "1px solid var(--c-accent)", outline: dragApi.dragOverIndex === i ? "2px solid var(--c-blue)" : "none" }}
+            >
+              <DragHandle ariaLabel={`Drag ${f.name}`} dragging={dragApi.isDragging} />
               <span style={{ fontSize: 16 }}>🖼️</span>
               <div style={{ flex: 1, overflow: "hidden" }}>
                 <div style={{ fontSize: 12, color: "var(--c-text)", textOverflow: "ellipsis", overflow: "hidden", whiteSpace: "nowrap" }}>{f.name}</div>
@@ -286,6 +337,8 @@ export default function BulkTab({ onNotice }) {
           </>
         )}
       </div>
+
+      <UrlImportModal open={urlOpen} onClose={() => setUrlOpen(false)} onAdd={addFiles} />
     </div>
   );
 }

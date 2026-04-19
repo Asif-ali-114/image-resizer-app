@@ -1,0 +1,60 @@
+:root {
+  --bp-mobile-max: 639px;
+  --bp-tablet-min: 640px;
+  --bp-tablet-max: 1023px;
+  --bp-laptop-min: 1024px;
+  --bp-laptop-max: 1439px;
+  --bp-desktop-min: 1440px;
+
+  --space-xs: 4px;
+  --space-sm: 8px;
+  --space-md: 16px;
+  --space-lg: 24px;
+  --space-xl: 32px;
+  --space-2xl: 48px;
+  --space-3xl: 64px;
+
+  --page-padding: 32px;
+  --card-padding: 24px;
+  --section-gap: 24px;
+  --grid-cols: 3;
+  --topbar-height: 56px;
+}
+
+@media (max-width: 639px) {
+  :root {
+    --page-padding: 16px;
+    --card-padding: 14px;
+    --section-gap: 16px;
+    --grid-cols: 1;
+    --topbar-height: 52px;
+  }
+}
+
+@media (min-width: 640px) and (max-width: 1023px) {
+  :root {
+    --page-padding: 24px;
+    --card-padding: 18px;
+    --section-gap: 20px;
+    --grid-cols: 2;
+    --topbar-height: 56px;
+  }
+}
+
+@media (min-width: 1024px) {
+  :root {
+    --page-padding: 32px;
+    --card-padding: 24px;
+    --section-gap: 24px;
+    --grid-cols: 3;
+    --topbar-height: 56px;
+  }
+}
+
+@media (min-width: 1440px) {
+  :root {
+    --page-padding: 40px;
+    --card-padding: 28px;
+    --section-gap: 28px;
+  }
+}
