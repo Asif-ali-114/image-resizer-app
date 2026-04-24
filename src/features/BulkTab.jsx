@@ -4,17 +4,17 @@ import Btn from "../components/Btn.jsx";
 import Card from "../components/Card.jsx";
 import DragHandle from "../components/DragHandle.jsx";
 import UrlImportModal from "../components/UrlImportModal.jsx";
+import SectionHeader from "../components/SectionHeader.jsx";
 import { validateImageFile } from "../utils/fileValidation.js";
 import { bytesToText } from "../utils/imageUtils.js";
-import { processBulkImages } from "../imagePipeline.js";
+import { downloadBlob, processBulkImages } from "../imagePipeline.js";
 import useDragToReorder from "../hooks/useDragToReorder.js";
 import { isCodecSupported } from "../utils/codecCapabilities.js";
+import { iconProps, ToolAlertIcon, ToolBoxesIcon, ToolCheckIcon, ToolDownloadIcon, ToolImageIcon, ToolXIcon } from "../components/AppIcons.jsx";
 
-function Sec({ children, icon }) {
-  return <h3 className="text-lg font-headline font-bold text-on-surface mb-4 flex items-center gap-2">{icon && <span className="text-xl">{icon}</span>}{children}</h3>;
-}
+const MAX = 20;
 
-export default function BulkTab({ onNotice }) {
+export default function BulkTab({ onNotice, prefillFiles }) {
   const [files, setFiles] = useState([]);
   const [scaleMode, setScaleMode] = useState("pixel");
   const [width, setWidth] = useState(800);
@@ -28,7 +28,7 @@ export default function BulkTab({ onNotice }) {
   const [results, setResults] = useState([]);
   const [urlOpen, setUrlOpen] = useState(false);
   const inputRef = useRef(null);
-  const MAX = 20;
+  const isCancelledRef = useRef(false);
   const orderedResults = useMemo(() => [...results].sort((a, b) => a.index - b.index), [results]);
   const orderedFailed = useMemo(() => [...failed].sort((a, b) => (a.index ?? 0) - (b.index ?? 0)), [failed]);
   const dragApi = useDragToReorder({ items: files, onReorder: setFiles });
@@ -69,9 +69,15 @@ export default function BulkTab({ onNotice }) {
     setProgMap({});
     setFailed([...validationFails, ...overLimit]);
     setResults([]);
-  }, [MAX, onNotice]);
+  }, [onNotice]);
+
+  useEffect(() => {
+    if (!prefillFiles?.id || !Array.isArray(prefillFiles.files) || !prefillFiles.files.length) return;
+    void addFiles(prefillFiles.files);
+  }, [addFiles, prefillFiles]);
 
   const processAll = useCallback(async () => {
+    isCancelledRef.current = false;
     setProcessing(true);
     setResults([]);
     setFailed([]);
@@ -80,6 +86,7 @@ export default function BulkTab({ onNotice }) {
       await processBulkImages({
         files,
         settings: { scaleMode, width, height, pct, format, quality },
+        isCancelledRef,
         onItemProgress: (index, progress) => {
           setProgMap((current) => ({ ...current, [index]: progress.progress }));
         },
@@ -112,8 +119,13 @@ export default function BulkTab({ onNotice }) {
       });
     } finally {
       setProcessing(false);
+      isCancelledRef.current = false;
     }
   }, [files, format, height, pct, quality, scaleMode, width]);
+
+  const handleCancel = useCallback(() => {
+    isCancelledRef.current = true;
+  }, []);
 
   const clearQueue = useCallback(() => {
     files.forEach((f) => {
@@ -183,24 +195,24 @@ export default function BulkTab({ onNotice }) {
           addFiles(e.dataTransfer.files);
         }}
         onClick={() => inputRef.current?.click()}
-        style={{ border: "2px dashed var(--c-blue)", borderRadius: 12, padding: 28, textAlign: "center", cursor: "pointer", background: "var(--c-bg)", marginBottom: 18 }}
+        className="mb-[18px] cursor-pointer rounded-xl border-2 border-dashed border-primary bg-surface p-7 text-center"
       >
-        <p style={{ margin: 0, color: "var(--c-navy)", fontWeight: 700, fontSize: 15 }}>
-          📂 Drop up to {MAX} images
+        <p className="m-0 flex items-center justify-center gap-2 text-[15px] font-bold text-on-surface">
+          <ToolBoxesIcon {...iconProps} size={16} />Drop up to {MAX} images
         </p>
-        <p style={{ margin: "5px 0 0", color: "var(--c-muted)", fontSize: 12 }}>JPG · PNG · WebP · GIF · Max 200MB total</p>
-        <input ref={inputRef} type="file" multiple accept="image/*" style={{ display: "none" }} onChange={(e) => addFiles(e.target.files)} />
-        <div style={{ marginTop: 10, display: "flex", justifyContent: "center" }}>
+        <p className="mb-0 mt-[5px] text-xs text-on-surface-variant">JPG · PNG · WebP · GIF · Max 200MB total</p>
+        <input ref={inputRef} type="file" multiple accept="image/*" className="hidden" onChange={(e) => addFiles(e.target.files)} />
+        <div className="mt-2.5 flex justify-center">
           <Btn small variant="secondary" onClick={(e) => { e.stopPropagation(); setUrlOpen(true); }} aria-label="Import images from URL">Import from URL</Btn>
         </div>
       </div>
 
-      <Card style={{ marginBottom: 18 }}>
-        <Sec>⚙ Batch Settings</Sec>
-        <div style={{ display: "flex", gap: 14, flexWrap: "wrap", alignItems: "flex-end" }}>
+      <Card className="mb-[18px]">
+        <SectionHeader><span className="inline-flex items-center gap-2"><ToolBoxesIcon {...iconProps} size={16} />Batch Settings</span></SectionHeader>
+        <div className="flex flex-wrap items-end gap-3.5">
           <div>
-            <label style={{ fontSize: 11, color: "var(--c-muted)", display: "block", marginBottom: 4 }}>Mode</label>
-            <div style={{ display: "flex", gap: 6 }}>
+            <label className="mb-1 block text-xs text-on-surface-variant">Mode</label>
+            <div className="flex gap-1.5">
               <Btn onClick={() => setScaleMode("pixel")} variant={scaleMode === "pixel" ? "primary" : "ghost"} small>
                 Pixels
               </Btn>
@@ -212,43 +224,43 @@ export default function BulkTab({ onNotice }) {
           {scaleMode === "pixel" ? (
             <>
               <div>
-                <label style={{ fontSize: 11, color: "var(--c-muted)", display: "block", marginBottom: 4 }}>Width</label>
-                <input type="number" value={width} onChange={(e) => setWidth(+e.target.value)} style={{ width: 76, padding: "7px 9px", border: "1px solid var(--c-blue)", borderRadius: 6 }} />
+                <label className="mb-1 block text-xs text-on-surface-variant">Width</label>
+                <input type="number" value={width} onChange={(e) => setWidth(+e.target.value)} className="w-[76px] rounded-md border border-primary px-[9px] py-[7px]" />
               </div>
               <div>
-                <label style={{ fontSize: 11, color: "var(--c-muted)", display: "block", marginBottom: 4 }}>Height</label>
-                <input type="number" value={height} onChange={(e) => setHeight(+e.target.value)} style={{ width: 76, padding: "7px 9px", border: "1px solid var(--c-blue)", borderRadius: 6 }} />
+                <label className="mb-1 block text-xs text-on-surface-variant">Height</label>
+                <input type="number" value={height} onChange={(e) => setHeight(+e.target.value)} className="w-[76px] rounded-md border border-primary px-[9px] py-[7px]" />
               </div>
             </>
           ) : (
-            <div style={{ flex: 1, minWidth: 160 }}>
-              <label style={{ fontSize: 11, color: "var(--c-muted)", display: "block", marginBottom: 4 }}>Scale: {pct}%</label>
-              <input type="range" min={1} max={300} value={pct} onChange={(e) => setPct(+e.target.value)} style={{ width: "100%", accentColor: "var(--c-navy)" }} />
+            <div className="min-w-40 flex-1">
+              <label className="mb-1 block text-xs text-on-surface-variant">Scale: {pct}%</label>
+              <input type="range" min={1} max={300} value={pct} onChange={(e) => setPct(+e.target.value)} className="w-full accent-primary" />
             </div>
           )}
           <div>
-            <label style={{ fontSize: 11, color: "var(--c-muted)", display: "block", marginBottom: 4 }}>Format</label>
-            <select value={format} onChange={(e) => setFormat(e.target.value)} style={{ padding: "7px 9px", border: "1px solid var(--c-blue)", borderRadius: 6 }}>
+            <label className="mb-1 block text-xs text-on-surface-variant">Format</label>
+            <select value={format} onChange={(e) => setFormat(e.target.value)} className="rounded-md border border-primary px-[9px] py-[7px]">
               {["JPG", "PNG", "WebP"].map((f) => (
                 <option key={f} disabled={!supportedFormats.includes(f)} title={!supportedFormats.includes(f) ? "Not supported in this browser" : undefined}>{f}</option>
               ))}
             </select>
           </div>
           {format !== "PNG" && (
-            <div style={{ minWidth: 110 }}>
-              <label style={{ fontSize: 11, color: "var(--c-muted)", display: "block", marginBottom: 4 }}>Quality: {quality}%</label>
-              <input type="range" min={10} max={100} value={quality} onChange={(e) => setQuality(+e.target.value)} style={{ width: "100%", accentColor: "var(--c-navy)" }} />
+            <div className="min-w-[110px]">
+              <label className="mb-1 block text-xs text-on-surface-variant">Quality: {quality}%</label>
+              <input type="range" min={10} max={100} value={quality} onChange={(e) => setQuality(+e.target.value)} className="w-full accent-primary" />
             </div>
           )}
         </div>
       </Card>
 
       {files.length > 0 && (
-        <Card style={{ marginBottom: 18 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-            <Sec>
-              📋 Files ({files.length}/{MAX}) · {(files.reduce((s, f) => s + f.size, 0) / 1024 / 1024).toFixed(1)} MB
-            </Sec>
+        <Card className="mb-[18px]">
+          <div className="mb-2.5 flex items-center justify-between">
+            <SectionHeader>
+              <span className="inline-flex items-center gap-2"><ToolImageIcon {...iconProps} size={16} />Files ({files.length}/{MAX}) · {(files.reduce((s, f) => s + f.size, 0) / 1024 / 1024).toFixed(1)} MB</span>
+            </SectionHeader>
             <Btn
               onClick={clearQueue}
               variant="ghost"
@@ -265,31 +277,31 @@ export default function BulkTab({ onNotice }) {
               onDragOver={(e) => dragApi.dragHandlers.onDragOver(e, i)}
               onDrop={() => dragApi.dragHandlers.onDrop(i)}
               onDragEnd={dragApi.dragHandlers.onDragEnd}
-              style={{ display: "flex", alignItems: "center", gap: 10, padding: "7px 0", borderBottom: "1px solid var(--c-accent)", outline: dragApi.dragOverIndex === i ? "2px solid var(--c-blue)" : "none" }}
+              className={`flex items-center gap-2.5 border-b border-outline-variant/40 py-[7px] ${dragApi.dragOverIndex === i ? "outline outline-2 outline-primary" : "outline-none"}`}
             >
               <DragHandle ariaLabel={`Drag ${f.name}`} dragging={dragApi.isDragging} />
-              <span style={{ fontSize: 16 }}>🖼️</span>
-              <div style={{ flex: 1, overflow: "hidden" }}>
-                <div style={{ fontSize: 12, color: "var(--c-text)", textOverflow: "ellipsis", overflow: "hidden", whiteSpace: "nowrap" }}>{f.name}</div>
-                <div style={{ fontSize: 10, color: "var(--c-muted)" }}>{(f.size / 1024).toFixed(0)} KB</div>
+              <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-surface-container text-primary"><ToolImageIcon {...iconProps} size={14} /></span>
+              <div className="flex-1 overflow-hidden">
+                <div className="overflow-hidden text-ellipsis whitespace-nowrap text-xs text-on-surface">{f.name}</div>
+                <div className="text-[10px] text-on-surface-variant">{(f.size / 1024).toFixed(0)} KB</div>
               </div>
               <button
                 type="button"
                 onClick={() => removeSingleFile(i)}
                 aria-label={`Remove ${f.name}`}
-                style={{ border: "none", background: "transparent", color: "var(--c-danger)", fontSize: 16, cursor: "pointer" }}
+                className="cursor-pointer border-none bg-transparent text-base text-error"
               >
-                ×
+                <ToolXIcon {...iconProps} size={14} />
               </button>
               {progMap[i] !== undefined ? (
-                <div style={{ width: 84 }}>
-                  <div style={{ height: 5, background: "var(--c-lb)", borderRadius: 3 }}>
-                    <div style={{ height: "100%", background: progMap[i] === 100 ? "var(--c-success)" : "var(--c-blue)", width: `${progMap[i]}%`, borderRadius: 3, transition: "width 0.08s" }} />
+                <div className="w-[84px]">
+                  <div className="h-[5px] rounded bg-outline-variant/40">
+                    <div className={`${progMap[i] === 100 ? "bg-green-400" : "bg-primary"} h-full rounded transition-[width] duration-100`} style={{ width: `${progMap[i]}%` }} />
                   </div>
-                  <div style={{ fontSize: 10, color: "var(--c-muted)", marginTop: 2, textAlign: "right" }}>{progMap[i] === 100 ? "✓ Done" : `${progMap[i]}%`}</div>
+                  <div className="mt-0.5 text-right text-[10px] text-on-surface-variant">{progMap[i] === 100 ? <span className="inline-flex items-center gap-1"><ToolCheckIcon {...iconProps} size={12} />Done</span> : `${progMap[i]}%`}</div>
                 </div>
               ) : (
-                <span style={{ fontSize: 10, color: "var(--c-muted)" }}>Pending</span>
+                <span className="text-[10px] text-on-surface-variant">Pending</span>
               )}
             </div>
           ))}
@@ -297,10 +309,10 @@ export default function BulkTab({ onNotice }) {
       )}
 
       {orderedFailed.length > 0 && (
-        <Card style={{ marginBottom: 18, border: "1px solid var(--c-danger)" }}>
-          <Sec>❌ Failed Files</Sec>
+        <Card className="mb-[18px] border border-error">
+          <SectionHeader><span className="inline-flex items-center gap-2"><ToolAlertIcon {...iconProps} size={16} />Failed Files</span></SectionHeader>
           {orderedFailed.map((f, i) => (
-            <div key={`${f.name}-${i}`} style={{ fontSize: 12, color: "var(--c-danger)", padding: "3px 0" }}>
+            <div key={`${f.name}-${i}`} className="py-[3px] text-xs text-error">
               • {f.name} — {f.reason}
             </div>
           ))}
@@ -308,30 +320,49 @@ export default function BulkTab({ onNotice }) {
       )}
 
       {orderedResults.length > 0 && (
-        <Card style={{ marginBottom: 18 }}>
-          <Sec>✅ Processed Files</Sec>
+        <Card className="mb-[18px]">
+          <SectionHeader><span className="inline-flex items-center gap-2"><ToolCheckIcon {...iconProps} size={16} />Processed Files</span></SectionHeader>
           {orderedResults.map((r, i) => (
-            <div key={`${r.name}-${i}`} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 0", borderBottom: "1px solid var(--c-accent)" }}>
-              <div style={{ flex: 1, overflow: "hidden" }}>
-                <div style={{ fontSize: 13, color: "var(--c-text)", textOverflow: "ellipsis", overflow: "hidden", whiteSpace: "nowrap" }}>{r.name}</div>
-                <div style={{ fontSize: 11, color: "var(--c-muted)" }}>{bytesToText(r.bytes)}</div>
+            <div key={`${r.name}-${i}`} className="flex items-center gap-2.5 border-b border-outline-variant/40 py-2">
+              <div className="flex-1 overflow-hidden">
+                <div className="overflow-hidden text-ellipsis whitespace-nowrap text-[13px] text-on-surface">{r.name}</div>
+                <div className="text-xs text-on-surface-variant">{bytesToText(r.bytes)}</div>
               </div>
+              <button
+                type="button"
+                onClick={() => downloadBlob(r.name, r.blob)}
+                className="cursor-pointer rounded px-1.5 py-0.5 text-xs text-primary"
+                aria-label={`Download ${r.name}`}
+              >
+                <ToolDownloadIcon {...iconProps} size={14} />
+              </button>
             </div>
           ))}
         </Card>
       )}
 
-      <div style={{ display: "flex", gap: 8 }}>
+      <div className="flex gap-2">
         {results.length === 0 ? (
-          <Btn onClick={processAll} disabled={files.length === 0 || processing} style={{ flex: 1 }}>
-            {processing ? "Processing..." : `⚡ Process ${files.length} File${files.length !== 1 ? "s" : ""}`}
-          </Btn>
+          processing ? (
+            <>
+              <Btn disabled className="flex-1">
+                {`Processing... (${Object.values(progMap).filter(p => p === 100).length}/${files.length})`}
+              </Btn>
+              <Btn onClick={handleCancel} variant="danger" className="flex-shrink-0">
+                Cancel
+              </Btn>
+            </>
+          ) : (
+            <Btn onClick={processAll} disabled={files.length === 0 || processing} className="flex-1">
+              {processing ? "Processing..." : `⚡ Process ${files.length} File${files.length !== 1 ? "s" : ""}`}
+            </Btn>
+          )
         ) : (
           <>
-            <Btn onClick={downloadAll} variant="success" size="lg" style={{ flex: 1 }}>
-              ⬇ Download ZIP
+            <Btn onClick={downloadAll} variant="success" size="lg" className="flex-1">
+              <span className="inline-flex items-center gap-2"><ToolDownloadIcon {...iconProps} size={16} />Download ZIP</span>
             </Btn>
-            <Btn onClick={() => setResults([])} variant="secondary" size="lg" style={{ flex: 1 }}>
+            <Btn onClick={() => setResults([])} variant="secondary" size="lg" className="flex-1">
               Re-process
             </Btn>
           </>

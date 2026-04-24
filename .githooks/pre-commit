@@ -1,0 +1,4 @@
+#!/usr/bin/env sh
+
+# Stop commit on lint errors.
+npm run lint

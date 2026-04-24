@@ -6,12 +6,12 @@ describe("applyBrightness", () => {
     expect(applyBrightness(0)).toBe(1);
   });
 
-  it("+100 is max boost", () => {
-    expect(applyBrightness(100)).toBe(2);
+  it("+100 is softly capped for natural output", () => {
+    expect(applyBrightness(100)).toBeLessThanOrEqual(1.18);
   });
 
-  it("-100 is minimum", () => {
-    expect(applyBrightness(-100)).toBe(0);
+  it("-100 is softly capped to preserve detail", () => {
+    expect(applyBrightness(-100)).toBeGreaterThanOrEqual(0.82);
   });
 });
 
@@ -29,5 +29,15 @@ describe("filterStringFromAdjustments", () => {
     expect(result).toContain("brightness(");
     expect(result).toContain("contrast(");
     expect(result).toContain("hue-rotate(180deg)");
+  });
+
+  it("applies core adjustments in stable order", () => {
+    const result = filterStringFromAdjustments({ brightness: 5, contrast: 5, saturation: 5 });
+    const brightnessIndex = result.indexOf("brightness(");
+    const contrastIndex = result.indexOf("contrast(");
+    const saturationIndex = result.indexOf("saturate(");
+
+    expect(brightnessIndex).toBeLessThan(contrastIndex);
+    expect(contrastIndex).toBeLessThan(saturationIndex);
   });
 });

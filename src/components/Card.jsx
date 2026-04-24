@@ -1,10 +1,10 @@
 export default function Card({ children, className = "", style }) {
   return (
     <div
-      className={`rounded-xl border p-6 ${className}`}
+      className={`ui-card rounded-2xl border p-6 transition-[transform,box-shadow,border-color,background-color] duration-150 ${className}`}
       style={{
-        background: "var(--color-base-0)",
-        borderColor: "var(--color-base-200)",
+        background: "var(--bg-card)",
+        borderColor: "var(--border-default)",
         boxShadow: "var(--shadow-sm)",
         ...style,
       }}

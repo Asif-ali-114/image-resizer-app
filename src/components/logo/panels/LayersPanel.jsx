@@ -1,4 +1,5 @@
 import { getObjectLabel } from "../../../utils/logo/fabricHelpers.js";
+import { iconProps, ToolChevronDownIcon, ToolChevronUpIcon, ToolEyeIcon, ToolEyeOffIcon, ToolLockIcon, ToolUnlockIcon, ToolXIcon } from "../../AppIcons.jsx";
 
 export default function LayersPanel({ layers, selectedId, onSelectLayer, onDeleteLayer, onToggleVisibility, onToggleLock, onMoveLayerUp, onMoveLayerDown, onGroupSelected, onUngroupSelected, onDuplicateSelected, onDeleteSelected }) {
   return (
@@ -13,14 +14,14 @@ export default function LayersPanel({ layers, selectedId, onSelectLayer, onDelet
       <div className="max-h-64 space-y-1 overflow-y-auto rounded-md border p-1" style={{ borderColor: "var(--logo-border)" }}>
         {layers.map((layer, idx) => (
           <div key={layer.id} className="flex items-center gap-1 rounded px-1 py-1 text-xs" style={{ backgroundColor: selectedId === layer.id ? "var(--logo-accent-soft)" : "transparent" }}>
-            <button type="button" title="Move up" onClick={() => onMoveLayerUp(layer.id)}>↑</button>
-            <button type="button" title="Move down" onClick={() => onMoveLayerDown(layer.id)}>↓</button>
-            <button type="button" title="Toggle visibility" onClick={() => onToggleVisibility(layer.id)}>{layer.visible ? "👁" : "🚫"}</button>
-            <button type="button" title="Toggle lock" onClick={() => onToggleLock(layer.id)}>{layer.locked ? "🔒" : "🔓"}</button>
+            <button type="button" title="Move up" onClick={() => onMoveLayerUp(layer.id)}><ToolChevronUpIcon {...iconProps} size={14} /></button>
+            <button type="button" title="Move down" onClick={() => onMoveLayerDown(layer.id)}><ToolChevronDownIcon {...iconProps} size={14} /></button>
+            <button type="button" title="Toggle visibility" onClick={() => onToggleVisibility(layer.id)}>{layer.visible ? <ToolEyeIcon {...iconProps} size={14} /> : <ToolEyeOffIcon {...iconProps} size={14} />}</button>
+            <button type="button" title="Toggle lock" onClick={() => onToggleLock(layer.id)}>{layer.locked ? <ToolLockIcon {...iconProps} size={14} /> : <ToolUnlockIcon {...iconProps} size={14} />}</button>
             <button type="button" aria-label={`Select ${getObjectLabel(layer.object)} layer`} className="flex-1 truncate text-left text-[var(--logo-text)]" onClick={() => onSelectLayer(layer.id)}>
               {getObjectLabel(layer.object)} {layers.length - idx}
             </button>
-            <button type="button" title="Delete layer" onClick={() => onDeleteLayer(layer.id)}>×</button>
+            <button type="button" title="Delete layer" onClick={() => onDeleteLayer(layer.id)}><ToolXIcon {...iconProps} size={14} /></button>
           </div>
         ))}
       </div>

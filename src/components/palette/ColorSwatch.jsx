@@ -1,9 +1,47 @@
+import { useRef } from "react";
 import Btn from "../Btn.jsx";
 
-export default function ColorSwatch({ color, onCopy, highlighted }) {
+export default function ColorSwatch({ color, onCopy, highlighted, onSelect, onColorChange, onDragStart, onDragOver, onDrop, index }) {
+  const colorInputRef = useRef(null);
+
   return (
-    <div className={`overflow-hidden rounded-xl border ${highlighted ? "border-primary ring-2 ring-primary/30" : "border-outline-variant/30"} bg-surface-container-low transition hover:shadow-card-sm`}>
-      <div className="h-20 w-full" style={{ background: color.hex }} />
+    <div
+      className={`overflow-hidden rounded-xl border ${highlighted ? "border-primary ring-2 ring-primary/30" : "border-outline-variant/30"} bg-surface-container-low transition hover:shadow-card-sm cursor-move`}
+      role="button"
+      tabIndex={0}
+      onClick={onSelect}
+      onKeyDown={(event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          onSelect?.();
+        }
+      }}
+      aria-pressed={highlighted}
+      draggable
+      onDragStart={(e) => onDragStart?.(e, index)}
+      onDragOver={onDragOver}
+      onDrop={(e) => onDrop?.(e, index)}
+    >
+      <div
+        className="h-20 w-full cursor-pointer relative group"
+        style={{ background: color.hex }}
+        onClick={(e) => {
+          e.stopPropagation();
+          colorInputRef.current?.click();
+        }}
+        title="Click to change color"
+      >
+        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100">
+          <span className="text-white text-xs font-semibold">Edit</span>
+        </div>
+      </div>
+      <input
+        ref={colorInputRef}
+        type="color"
+        value={color.hex}
+        onChange={(e) => onColorChange?.(index, e.target.value)}
+        className="sr-only"
+      />
       <div className="space-y-1 p-3">
         <p className="font-headline text-sm font-bold text-on-surface capitalize">{color.name}</p>
         <p className="font-mono text-sm font-semibold text-on-surface">{color.hex}</p>

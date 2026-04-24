@@ -1,4 +1,5 @@
 import Card from "./Card.jsx";
+import { iconProps, ToolCheckIcon } from "./AppIcons.jsx";
 
 function Stat({ label, value, tone = "default" }) {
   const toneClass = tone === "good"
@@ -21,7 +22,7 @@ export default function ConversionSummary({ filesConverted, mbSaved, avgReductio
   return (
     <Card>
       <div className="grid gap-3 sm:grid-cols-3">
-        <Stat label="Files Converted" value={`✓ ${filesConverted}`} tone="good" />
+        <Stat label="Files Converted" value={<span className="inline-flex items-center gap-2"><ToolCheckIcon {...iconProps} size={14} />{filesConverted}</span>} tone="good" />
         <Stat label="Total Change" value={`${mbSaved >= 0 ? "↓" : "↑"} ${Math.abs(mbSaved).toFixed(2)} MB`} tone={mbSaved >= 0 ? "good" : "warn"} />
         <Stat label="Average Size Delta" value={`${avgReduction >= 0 ? "↓" : "↑"} ${Math.abs(avgReduction).toFixed(1)}%`} tone={reductionTone} />
       </div>

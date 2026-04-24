@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import JSZip from "jszip";
 import Btn from "../components/Btn.jsx";
 import Card from "../components/Card.jsx";
@@ -22,11 +22,7 @@ import {
 import { convertImage } from "../imagePipeline.js";
 import useDragToReorder from "../hooks/useDragToReorder.js";
 import { loadFromSession, saveToSession } from "../utils/sessionStore.js";
-
-function uid() {
-  if (typeof globalThis !== "undefined" && globalThis.crypto?.randomUUID) return globalThis.crypto.randomUUID();
-  return `conv-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-}
+import { generateId } from "../utils/generateId.js";
 
 function toMb(bytes) {
   return bytes / 1024 / 1024;
@@ -47,6 +43,7 @@ export default function ConvertTab({ onNotice }) {
   const [dragging, setDragging] = useState(false);
   const [pasteToast, setPasteToast] = useState(false);
   const [urlOpen, setUrlOpen] = useState(false);
+  const isRunningRef = useRef(false);
 
   const dragApi = useDragToReorder({ items: files, onReorder: setFiles });
   const supportedOutputs = useMemo(() => getSupportedOutputFormats(), []);
@@ -118,7 +115,7 @@ export default function ConvertTab({ onNotice }) {
 
       const thumbnail = URL.createObjectURL(file);
       additions.push({
-        id: uid(),
+        id: generateId(),
         file,
         name: file.name,
         size: file.size,
@@ -189,6 +186,70 @@ export default function ConvertTab({ onNotice }) {
     return () => document.removeEventListener("paste", onPaste);
   }, [addFiles]);
 
+  const handleConvert = useCallback(async () => {
+    if (!files.length || converting || isRunningRef.current) return;
+    isRunningRef.current = true;
+
+    setConverting(true);
+    setError(null);
+    setProgress({ done: 0, total: files.length });
+
+    const outW = overrideRes ? Math.max(1, Number(overrideW) || 0) : undefined;
+    const outH = overrideRes ? Math.max(1, Number(overrideH) || 0) : undefined;
+    const queue = [...files];
+    const CONCURRENCY = 3;
+
+    while (queue.length) {
+      const batch = queue.splice(0, CONCURRENCY);
+      await Promise.all(
+        batch.map(async (item) => {
+          setFiles((current) => current.map((entry) => (entry.id === item.id ? { ...entry, status: "converting", error: null } : entry)));
+
+          const result = await convertImage({
+            file: item.file,
+            outputFormat: item.outputFormat,
+            quality,
+            background,
+            width: outW || undefined,
+            height: outH || undefined,
+          });
+
+          if (result?.error) {
+            setFiles((current) =>
+              current.map((entry) =>
+                entry.id === item.id
+                  ? { ...entry, status: "error", error: result.error }
+                  : entry,
+              ),
+            );
+          } else {
+            const outputUrl = URL.createObjectURL(result.blob);
+            setFiles((current) =>
+              current.map((entry) =>
+                entry.id === item.id
+                  ? {
+                      ...entry,
+                      status: "done",
+                      result: {
+                        blob: result.blob,
+                        convertedSize: result.convertedSize,
+                        outputUrl,
+                      },
+                    }
+                  : entry,
+              ),
+            );
+          }
+
+          setProgress((current) => ({ ...current, done: current.done + 1 }));
+        }),
+      );
+    }
+
+    setConverting(false);
+    isRunningRef.current = false;
+  }, [background, converting, files, overrideH, overrideRes, overrideW, quality]);
+
   useEffect(() => {
     const onShortcut = (event) => {
       if (event?.detail?.action === "convert-start") {
@@ -208,62 +269,6 @@ export default function ConvertTab({ onNotice }) {
       window.removeEventListener("imagetools:shortcut", onShortcut);
     };
   }, [clearAll, converting, files.length, handleConvert]);
-
-  const handleConvert = useCallback(async () => {
-    if (!files.length || converting) return;
-
-    setConverting(true);
-    setError(null);
-    setProgress({ done: 0, total: files.length });
-
-    for (let i = 0; i < files.length; i += 1) {
-      const item = files[i];
-      setFiles((current) => current.map((entry) => (entry.id === item.id ? { ...entry, status: "converting", error: null } : entry)));
-
-      const outW = overrideRes ? Math.max(1, Number(overrideW) || 0) : undefined;
-      const outH = overrideRes ? Math.max(1, Number(overrideH) || 0) : undefined;
-
-      const result = await convertImage({
-        file: item.file,
-        outputFormat: item.outputFormat,
-        quality,
-        background,
-        width: outW || undefined,
-        height: outH || undefined,
-      });
-
-      if (result?.error) {
-        setFiles((current) =>
-          current.map((entry) =>
-            entry.id === item.id
-              ? { ...entry, status: "error", error: result.error }
-              : entry,
-          ),
-        );
-      } else {
-        const outputUrl = URL.createObjectURL(result.blob);
-        setFiles((current) =>
-          current.map((entry) =>
-            entry.id === item.id
-              ? {
-                  ...entry,
-                  status: "done",
-                  result: {
-                    blob: result.blob,
-                    convertedSize: result.convertedSize,
-                    outputUrl,
-                  },
-                }
-              : entry,
-          ),
-        );
-      }
-
-      setProgress((current) => ({ ...current, done: i + 1 }));
-    }
-
-    setConverting(false);
-  }, [background, converting, files, overrideH, overrideRes, overrideW, quality]);
 
   useEffect(() => {
     const onEnterConvert = (event) => {
@@ -344,14 +349,6 @@ export default function ConvertTab({ onNotice }) {
 
   return (
     <div className="space-y-5">
-      <style>{`
-        @keyframes convert-spin { to { transform: rotate(360deg); } }
-        @keyframes convert-pop { from { transform: scale(0.5); opacity: 0; } to { transform: scale(1); opacity: 1; } }
-        @keyframes convert-fade { from { transform: translateY(4px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
-        .convert-spin { animation: convert-spin 0.7s linear infinite; }
-        .convert-pop { animation: convert-pop 0.2s ease; }
-        .convert-fade { animation: convert-fade 0.25s ease; }
-      `}</style>
 
       {pasteToast && (
         <div className="fixed right-4 top-24 z-50 rounded-lg border border-primary/30 bg-primary/10 px-3 py-2 text-sm font-semibold text-on-surface">
@@ -488,15 +485,15 @@ export default function ConvertTab({ onNotice }) {
       {files.length > 0 && (
         <Card>
           <div className="space-y-3">
-            {files.map((item) => (
+            {files.map((item, idx) => (
               <div
                 key={item.id}
                 draggable
-                onDragStart={() => dragApi.dragHandlers.onDragStart(files.findIndex((entry) => entry.id === item.id))}
-                onDragOver={(e) => dragApi.dragHandlers.onDragOver(e, files.findIndex((entry) => entry.id === item.id))}
-                onDrop={() => dragApi.dragHandlers.onDrop(files.findIndex((entry) => entry.id === item.id))}
+                onDragStart={() => dragApi.dragHandlers.onDragStart(idx)}
+                onDragOver={(e) => dragApi.dragHandlers.onDragOver(e, idx)}
+                onDrop={() => dragApi.dragHandlers.onDrop(idx)}
                 onDragEnd={dragApi.dragHandlers.onDragEnd}
-                className={dragApi.dragOverIndex === files.findIndex((entry) => entry.id === item.id) ? "rounded-xl ring-2 ring-primary" : ""}
+                className={dragApi.dragOverIndex === idx ? "rounded-xl ring-2 ring-primary" : ""}
               >
                 <ConvertFileRow
                   item={item}

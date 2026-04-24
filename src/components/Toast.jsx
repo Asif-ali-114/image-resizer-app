@@ -1,4 +1,5 @@
 import Btn from "./Btn.jsx";
+import { iconProps, ToolAlertIcon, ToolCheckIcon, ToolInfoIcon, ToolXIcon } from "./AppIcons.jsx";
 
 const TOAST_TONE = {
   success: "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
@@ -8,10 +9,10 @@ const TOAST_TONE = {
 };
 
 const ICON = {
-  success: "✓",
-  error: "⚠",
-  info: "i",
-  warning: "!",
+  success: ToolCheckIcon,
+  error: ToolAlertIcon,
+  info: ToolInfoIcon,
+  warning: ToolAlertIcon,
 };
 
 export default function Toast({ toasts, onRemove }) {
@@ -29,7 +30,10 @@ export default function Toast({ toasts, onRemove }) {
           aria-live="polite"
         >
           <div className="flex items-start gap-2">
-            <span className="mt-0.5 text-sm font-bold">{ICON[toast.type] || ICON.info}</span>
+            {(() => {
+              const Icon = ICON[toast.type] || ICON.info;
+              return <span className="mt-0.5 inline-flex h-6 w-6 items-center justify-center rounded-full bg-current/10 text-current"><Icon {...iconProps} size={14} /></span>;
+            })()}
             <div className="min-w-0 flex-1">
               <p className="text-sm font-semibold">{toast.message}</p>
               {toast.actionLabel && toast.onAction && (
@@ -44,7 +48,7 @@ export default function Toast({ toasts, onRemove }) {
               className="rounded-full p-1 text-xs hover:bg-surface-container"
               aria-label="Close toast"
             >
-              ×
+              <ToolXIcon {...iconProps} size={14} />
             </button>
           </div>
         </div>

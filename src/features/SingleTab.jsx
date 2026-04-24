@@ -3,7 +3,8 @@ import StepBar from "../components/StepBar.jsx";
 import UploadStep from "../steps/UploadStep.jsx";
 import ResizeStep from "../steps/ResizeStep.jsx";
 import OutputStep from "../steps/OutputStep.jsx";
-import { bytesToText } from "../utils/imageUtils.js";
+import { bytesToText, loadImageFromUrl } from "../utils/imageUtils.js";
+import { iconProps, ToolImageIcon } from "../components/AppIcons.jsx";
 
 const CropStep = lazy(() => import("../steps/CropStep.jsx"));
 
@@ -11,7 +12,7 @@ function LoadingFallback() {
   return <div className="p-8 text-center text-on-surface-variant">Loading…</div>;
 }
 
-function SingleTab({ onNotice, onOpenTool }) {
+function SingleTab({ onNotice, onOpenTool, prefillFile }) {
   const [step, setStep] = useState(0);
   const [image, setImage] = useState(null);
   const [settings, setSettings] = useState(null);
@@ -30,6 +31,45 @@ function SingleTab({ onNotice, onOpenTool }) {
       if (image?.url) URL.revokeObjectURL(image.url);
     };
   }, [image]);
+
+  useEffect(() => {
+    if (!prefillFile?.file || !prefillFile?.id) return;
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const file = prefillFile.file;
+        const nextUrl = URL.createObjectURL(file);
+        const img = await loadImageFromUrl(nextUrl);
+        if (cancelled) {
+          URL.revokeObjectURL(nextUrl);
+          return;
+        }
+
+        setImage((current) => {
+          if (current?.url) URL.revokeObjectURL(current.url);
+          return {
+            file,
+            url: nextUrl,
+            w: img.width,
+            h: img.height,
+            size: file.size,
+            name: file.name,
+            type: file.type,
+          };
+        });
+        setSettings(null);
+        setCropData(null);
+        setStep(1);
+      } catch {
+        onNotice?.({ type: "error", message: "Could not read dropped image." });
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [onNotice, prefillFile]);
 
   const singleSummary = useMemo(
     () =>
@@ -97,7 +137,7 @@ function SingleTab({ onNotice, onOpenTool }) {
             </div>
           ) : (
             <div className="rounded-2xl bg-surface-container-low p-6 text-center">
-              <div className="mb-3 text-4xl">🖼️</div>
+              <div className="mx-auto mb-3 inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10 text-primary"><ToolImageIcon {...iconProps} size={24} /></div>
               <p className="mx-auto max-w-full overflow-hidden text-ellipsis whitespace-nowrap font-semibold text-on-surface">Drop an image to start</p>
             </div>
           )}

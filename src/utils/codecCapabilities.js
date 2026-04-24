@@ -92,8 +92,8 @@ export async function probeCodecs() {
 
     for (const [name, probe] of Object.entries(probes)) {
       try {
-        await probe();
-        codecSupport.set(name, true);
+        const supported = await probe();
+        codecSupport.set(name, Boolean(supported));
       } catch {
         codecSupport.set(name, false);
       }

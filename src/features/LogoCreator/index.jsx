@@ -10,13 +10,31 @@ import LogoBottomBar from "../../components/logo/LogoBottomBar.jsx";
 import ExportModal from "../../components/logo/modals/ExportModal.jsx";
 import CanvasSizeModal from "../../components/logo/modals/CanvasSizeModal.jsx";
 import SavedDesignsModal from "../../components/logo/modals/SavedDesignsModal.jsx";
+import SaveNameModal from "../../components/logo/modals/SaveNameModal.jsx";
+import ConfirmActionModal from "../../components/logo/modals/ConfirmActionModal.jsx";
 import CanvasHistory from "../../utils/logo/canvasHistory.js";
 import { buildGoogleFontsCssUrl } from "../../utils/logo/fontList.js";
 import { createShape, centerObject, getObjectLabel, sanitizeFilename } from "../../utils/logo/fabricHelpers.js";
 import { exportJPEG, exportPDF, exportPNG, exportSVG } from "../../utils/logo/exportUtils.js";
+import { generateId } from "../../utils/generateId.js";
 
 const AUTOSAVE_KEY = "logocreator_autosave";
 const SAVES_KEY = "logocreator_saves";
+
+function isQuotaExceededError(error) {
+  return error instanceof globalThis.DOMException && (error.name === "QuotaExceededError" || error.code === 22 || error.code === 1014);
+}
+
+function downloadCanvasAsJson(canvasJson, filename = "logo-design.json") {
+  const json = JSON.stringify(canvasJson);
+  const blob = new Blob([json], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
 
 function useViewportMode() {
   const [mode, setMode] = useState("desktop");
@@ -36,7 +54,7 @@ function useViewportMode() {
 
 function readSaves() {
   try {
-    const parsed = JSON.parse(window.sessionStorage.getItem(SAVES_KEY) || "[]");
+    const parsed = JSON.parse(window.localStorage.getItem(SAVES_KEY) || "[]");
     return Array.isArray(parsed) ? parsed.slice(0, 10) : [];
   } catch {
     return [];
@@ -67,6 +85,9 @@ export default function LogoCreator({ onNotice, isActive, onBackHome, persistedC
   const [exportOpen, setExportOpen] = useState(false);
   const [canvasSizeOpen, setCanvasSizeOpen] = useState(false);
   const [savedDesignsOpen, setSavedDesignsOpen] = useState(false);
+  const [saveNameOpen, setSaveNameOpen] = useState(false);
+  const [saveNameDefault, setSaveNameDefault] = useState("");
+  const [confirmState, setConfirmState] = useState({ open: false, title: "", message: "", confirmLabel: "Confirm" });
   const [saves, setSaves] = useState(() => readSaves());
 
   const canvasRef = useRef(null);
@@ -74,13 +95,14 @@ export default function LogoCreator({ onNotice, isActive, onBackHome, persistedC
   const clipboardRef = useRef(null);
   const autosaveTimeoutRef = useRef(null);
   const isDirtyRef = useRef(false);
+  const pendingConfirmActionRef = useRef(null);
 
   const refreshLayers = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const objects = canvas.getObjects();
-    const list = [...objects].reverse().map((obj, index) => {
-      if (!obj.__layerId) obj.__layerId = `${Date.now()}-${Math.random()}-${index}`;
+    const list = [...objects].reverse().map((obj) => {
+      if (!obj.__layerId) obj.__layerId = generateId();
       return {
         id: obj.__layerId,
         object: obj,
@@ -102,13 +124,20 @@ export default function LogoCreator({ onNotice, isActive, onBackHome, persistedC
         canvasHeight,
         timestamp: Date.now(),
       };
-      window.sessionStorage.setItem(AUTOSAVE_KEY, JSON.stringify(payload));
+      window.localStorage.setItem(AUTOSAVE_KEY, JSON.stringify(payload));
       if (persistedCanvasJsonRef) persistedCanvasJsonRef.current = payload.canvasJSON;
       isDirtyRef.current = false;
-    } catch {
-      // noop
+    } catch (error) {
+      if (isQuotaExceededError(error)) {
+        const canvas = canvasRef.current;
+        const canvasJson = canvas?.toJSON();
+        if (canvasJson) {
+          downloadCanvasAsJson(canvasJson);
+        }
+        onNotice?.({ type: "warning", message: "Design too large for auto-save. Your design has been saved as a file." });
+      }
     }
-  }, [canvasWidth, canvasHeight, persistedCanvasJsonRef]);
+  }, [canvasWidth, canvasHeight, onNotice, persistedCanvasJsonRef]);
 
   const scheduleAutosave = useCallback(() => {
     if (autosaveTimeoutRef.current) window.clearTimeout(autosaveTimeoutRef.current);
@@ -152,7 +181,7 @@ export default function LogoCreator({ onNotice, isActive, onBackHome, persistedC
       });
     }
 
-    const maybeAutosave = window.sessionStorage.getItem(AUTOSAVE_KEY);
+    const maybeAutosave = window.localStorage.getItem(AUTOSAVE_KEY);
     if (maybeAutosave) {
       onNotice?.({
         type: "info",
@@ -295,7 +324,7 @@ export default function LogoCreator({ onNotice, isActive, onBackHome, persistedC
 
   const uploadImages = useCallback((files) => {
     const accepted = files.filter((file) => /image\/(jpeg|png|webp|svg\+xml|gif)/.test(file.type));
-    const next = accepted.map((file) => ({ id: `${Date.now()}-${file.name}-${Math.random()}`, name: file.name, file, url: URL.createObjectURL(file) }));
+    const next = accepted.map((file) => ({ id: generateId(), name: file.name, file, url: URL.createObjectURL(file) }));
     setImages((prev) => [...next, ...prev].slice(0, 40));
   }, []);
 
@@ -377,23 +406,60 @@ export default function LogoCreator({ onNotice, isActive, onBackHome, persistedC
     scheduleAutosave();
   }, [refreshLayers, scheduleAutosave]);
 
-  const loadTemplate = useCallback((template) => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    if (isDirtyRef.current && !window.confirm("Replace current design with this template?")) return;
-    setCanvasWidth(template.canvasWidth);
-    setCanvasHeight(template.canvasHeight);
-    canvas.loadFromJSON(template.fabricJSON, () => {
-      canvas.setWidth(template.canvasWidth * zoom);
-      canvas.setHeight(template.canvasHeight * zoom);
-      canvas.renderAll();
-      historyRef.current?.clear();
-      historyRef.current?.save();
-      refreshLayers();
-      scheduleAutosave();
-      onNotice?.({ type: "success", message: `Template '${template.name}' loaded.` });
+  const requestConfirm = useCallback((config, action) => {
+    pendingConfirmActionRef.current = action;
+    setConfirmState({
+      open: true,
+      title: config.title,
+      message: config.message,
+      confirmLabel: config.confirmLabel || "Confirm",
     });
-  }, [onNotice, refreshLayers, scheduleAutosave, zoom]);
+  }, []);
+
+  const closeConfirm = useCallback(() => {
+    pendingConfirmActionRef.current = null;
+    setConfirmState((current) => ({ ...current, open: false }));
+  }, []);
+
+  const confirmPendingAction = useCallback(() => {
+    const action = pendingConfirmActionRef.current;
+    pendingConfirmActionRef.current = null;
+    setConfirmState((current) => ({ ...current, open: false }));
+    action?.();
+  }, []);
+
+  const loadTemplate = useCallback((template) => {
+    const applyTemplate = () => {
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+      setCanvasWidth(template.canvasWidth);
+      setCanvasHeight(template.canvasHeight);
+      canvas.loadFromJSON(template.fabricJSON, () => {
+        canvas.setWidth(template.canvasWidth * zoom);
+        canvas.setHeight(template.canvasHeight * zoom);
+        canvas.renderAll();
+        historyRef.current?.clear();
+        historyRef.current?.save();
+        refreshLayers();
+        scheduleAutosave();
+        onNotice?.({ type: "success", message: `Template '${template.name}' loaded.` });
+      });
+    };
+
+    if (isDirtyRef.current) {
+      requestConfirm(
+        {
+          title: "Replace current design?",
+          message: "Unsaved changes will be replaced by this template.",
+          confirmLabel: "Replace",
+        },
+        applyTemplate,
+      );
+      return;
+    }
+
+    applyTemplate();
+  }, [onNotice, refreshLayers, requestConfirm, scheduleAutosave, zoom]);
 
   const copySelected = useCallback(() => {
     const active = canvasRef.current?.getActiveObject();
@@ -497,10 +563,17 @@ export default function LogoCreator({ onNotice, isActive, onBackHome, persistedC
   const saveDesign = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const name = window.prompt("Design name", `design-${new Date().toISOString().slice(0, 10)}`);
+    setSaveNameDefault(`design-${new Date().toISOString().slice(0, 10)}`);
+    setSaveNameOpen(true);
+  }, []);
+
+  const saveDesignWithName = useCallback((inputName) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const name = (inputName || saveNameDefault).trim();
     if (!name) return;
     const item = {
-      id: `${Date.now()}-${Math.random()}`,
+      id: generateId(),
       name,
       timestamp: Date.now(),
       canvasJSON: canvas.toJSON(),
@@ -510,32 +583,58 @@ export default function LogoCreator({ onNotice, isActive, onBackHome, persistedC
     };
     setSaves((prev) => {
       const next = [item, ...prev].slice(0, 10);
-      window.sessionStorage.setItem(SAVES_KEY, JSON.stringify(next));
+      try {
+        window.localStorage.setItem(SAVES_KEY, JSON.stringify(next));
+      } catch (error) {
+        if (isQuotaExceededError(error)) {
+          onNotice?.({ type: "error", message: "Design too large to save. Try removing some images." });
+        }
+      }
       return next;
     });
+    setSaveNameOpen(false);
     onNotice?.({ type: "success", message: "Design saved." });
-  }, [canvasHeight, canvasWidth, onNotice]);
+  }, [canvasHeight, canvasWidth, onNotice, saveNameDefault]);
 
   const loadSave = useCallback((save) => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    if (isDirtyRef.current && !window.confirm("Replace current design with saved design?")) return;
-    setCanvasWidth(save.canvasWidth || 800);
-    setCanvasHeight(save.canvasHeight || 600);
-    canvas.loadFromJSON(save.canvasJSON, () => {
-      canvas.renderAll();
-      historyRef.current?.clear();
-      historyRef.current?.save();
-      refreshLayers();
-      scheduleAutosave();
-      setSavedDesignsOpen(false);
-    });
-  }, [refreshLayers, scheduleAutosave]);
+    const applySave = () => {
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+      setCanvasWidth(save.canvasWidth || 800);
+      setCanvasHeight(save.canvasHeight || 600);
+      canvas.loadFromJSON(save.canvasJSON, () => {
+        canvas.renderAll();
+        historyRef.current?.clear();
+        historyRef.current?.save();
+        refreshLayers();
+        scheduleAutosave();
+        setSavedDesignsOpen(false);
+      });
+    };
+
+    if (isDirtyRef.current) {
+      requestConfirm(
+        {
+          title: "Replace current design?",
+          message: "Unsaved changes will be replaced by the selected saved design.",
+          confirmLabel: "Load Design",
+        },
+        applySave,
+      );
+      return;
+    }
+
+    applySave();
+  }, [refreshLayers, requestConfirm, scheduleAutosave]);
 
   const deleteSave = useCallback((id) => {
     setSaves((prev) => {
       const next = prev.filter((save) => save.id !== id);
-      window.sessionStorage.setItem(SAVES_KEY, JSON.stringify(next));
+      try {
+        window.localStorage.setItem(SAVES_KEY, JSON.stringify(next));
+      } catch {
+        // ignore storage failures while deleting saves
+      }
       return next;
     });
   }, []);
@@ -789,6 +888,20 @@ export default function LogoCreator({ onNotice, isActive, onBackHome, persistedC
       <ExportModal open={exportOpen} onClose={() => setExportOpen(false)} canvasWidth={canvasWidth} canvasHeight={canvasHeight} onExport={onExport} />
       <CanvasSizeModal open={canvasSizeOpen} width={canvasWidth} height={canvasHeight} onClose={() => setCanvasSizeOpen(false)} onApply={(w, h) => { applyCanvasSize(w, h); setCanvasSizeOpen(false); }} />
       <SavedDesignsModal open={savedDesignsOpen} onClose={() => setSavedDesignsOpen(false)} saves={saves} onLoad={loadSave} onDelete={deleteSave} />
+      <SaveNameModal
+        open={saveNameOpen}
+        defaultName={saveNameDefault}
+        onSave={saveDesignWithName}
+        onClose={() => setSaveNameOpen(false)}
+      />
+      <ConfirmActionModal
+        open={confirmState.open}
+        title={confirmState.title}
+        message={confirmState.message}
+        confirmLabel={confirmState.confirmLabel}
+        onConfirm={confirmPendingAction}
+        onClose={closeConfirm}
+      />
     </section>
   );
 }

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTemporaryScrollLock } from "../hooks/useScrollLock.js";
+import { iconProps, ToolSearchIcon, ToolXIcon } from "./AppIcons.jsx";
 
 function scoreTool(tool, query) {
   const q = query.trim().toLowerCase();
@@ -11,18 +12,21 @@ function scoreTool(tool, query) {
 }
 
 function ResultItem({ item, active, onSelect }) {
+  const Icon = item.icon;
   return (
     <button
       type="button"
       onClick={() => onSelect(item)}
       className={`flex h-14 w-full items-center gap-3 rounded-lg px-4 text-left transition-colors ${active ? "border-l-2 border-l-primary bg-surface-container-low" : "hover:bg-surface-container-low"}`}
     >
-      <span className="text-lg" style={{ color: item.color }} aria-hidden="true">{item.icon}</span>
+      <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-outline-variant/40 bg-surface-container-lowest text-[var(--accent)]" aria-hidden="true">
+        {Icon ? <Icon {...iconProps} /> : null}
+      </span>
       <span className="min-w-0 flex-1">
         <span className="block truncate text-sm font-medium text-on-surface">{item.label}</span>
         <span className="block truncate text-xs text-on-surface-variant">{item.description}</span>
       </span>
-      {active && <span className="text-[11px] text-on-surface-variant">↵</span>}
+      {active && <span className="text-[11px] text-on-surface-variant">Enter</span>}
     </button>
   );
 }
@@ -91,7 +95,7 @@ export default function CommandPalette({ open, tools, actions, recentTools = [],
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-[140] bg-black/50" onClick={onClose} role="presentation">
+    <div className="fixed inset-0 z-[140] bg-black/40 backdrop-blur-[2px]" onClick={onClose} role="presentation">
       <div
         className="mx-auto mt-[15vh] max-h-[70vh] w-[calc(100%-48px)] max-w-[560px] overflow-y-auto rounded-2xl border border-outline-variant/40 bg-surface shadow-card max-md:mt-auto max-md:h-[92vh] max-md:w-full max-md:max-w-none max-md:rounded-t-2xl max-md:rounded-b-none"
         onClick={(event) => event.stopPropagation()}
@@ -110,7 +114,9 @@ export default function CommandPalette({ open, tools, actions, recentTools = [],
 
         <div className="sticky top-0 z-10 border-b border-outline-variant/20 bg-surface p-3">
           <div className="flex items-center rounded-xl border border-outline-variant/40 bg-surface-container-low px-3 py-2">
-            <span className="mr-2" aria-hidden="true">🔍</span>
+            <span className="mr-2 inline-flex h-8 w-8 items-center justify-center rounded-lg bg-surface-container-lowest text-[var(--accent)]" aria-hidden="true">
+              <ToolSearchIcon {...iconProps} />
+            </span>
             <input
               ref={inputRef}
               value={query}
@@ -119,7 +125,9 @@ export default function CommandPalette({ open, tools, actions, recentTools = [],
               className="w-full bg-transparent text-sm outline-none"
             />
             {query && (
-              <button type="button" onClick={() => setQuery("")} aria-label="Clear search" className="text-xs">×</button>
+              <button type="button" onClick={() => setQuery("")} aria-label="Clear search" className="inline-flex h-7 w-7 items-center justify-center rounded-md text-xs text-on-surface-variant hover:bg-surface-container">
+                <ToolXIcon {...iconProps} size={14} />
+              </button>
             )}
             <span className="ml-2 rounded-md bg-surface-container px-2 py-0.5 text-[11px] text-on-surface-variant">Esc</span>
           </div>
@@ -130,7 +138,7 @@ export default function CommandPalette({ open, tools, actions, recentTools = [],
             <SectionLabel text="Recently Used" />
             <div className="px-2">
               {visibleRecent.map((item, idx) => (
-                <ResultItem key={`recent-${item.id}`} item={{ ...item, icon: "🕘" } } active={activeIndex === idx} onSelect={() => {
+                <ResultItem key={`recent-${item.id}`} item={item} active={activeIndex === idx} onSelect={() => {
                   onOpenTool(item.id);
                   onClose();
                 }} />

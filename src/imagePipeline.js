@@ -82,12 +82,109 @@ function drawHighQualityCanvas(sourceCanvas, targetW, targetH, canvasFactory = c
   return current;
 }
 
+function drawResizeCanvas(sourceCanvas, targetW, targetH, resizeMode = "stretch", canvasFactory = createCanvas) {
+  const srcW = sourceCanvas.width;
+  const srcH = sourceCanvas.height;
+
+  if (resizeMode === "fit" || resizeMode === "fill") {
+    const scaleF = Math.min(targetW / srcW, targetH / srcH); // fit
+    const scaleL = Math.max(targetW / srcW, targetH / srcH); // fill
+    const scale = resizeMode === "fit" ? scaleF : scaleL;
+
+    const dw = srcW * scale;
+    const dh = srcH * scale;
+    const dx = (targetW - dw) / 2;
+    const dy = (targetH - dh) / 2;
+
+    // Create intermediate canvas for scaling
+    const scaled = canvasFactory(Math.ceil(dw), Math.ceil(dh));
+    const sctx = scaled.getContext("2d");
+    sctx.imageSmoothingEnabled = true;
+    sctx.imageSmoothingQuality = "high";
+    sctx.drawImage(sourceCanvas, 0, 0, dw, dh);
+
+    // Create final canvas
+    const out = canvasFactory(targetW, targetH);
+    const octx = out.getContext("2d");
+
+    // Fill background for fit mode (for JPEGs that need white)
+    if (resizeMode === "fit") {
+      octx.fillStyle = "#ffffff";
+      octx.fillRect(0, 0, targetW, targetH);
+    }
+
+    octx.imageSmoothingEnabled = true;
+    octx.imageSmoothingQuality = "high";
+    octx.drawImage(scaled, dx, dy);
+    return out;
+  }
+
+  // stretch mode (default)
+  return drawHighQualityCanvas(sourceCanvas, targetW, targetH, canvasFactory);
+}
+
 async function canvasToBlob(canvas, type, quality) {
   if (typeof canvas.convertToBlob === "function") {
     return await canvas.convertToBlob({ type, quality });
   }
 
   return await new Promise((resolve) => canvas.toBlob(resolve, type, quality));
+}
+
+async function blobToDataUrl(blob) {
+  return await new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = () => reject(new Error("Unable to read binary data."));
+    reader.readAsDataURL(blob);
+  });
+}
+
+async function dataUrlToBlob(dataUrl) {
+  const response = await globalThis.fetch(dataUrl);
+  return await response.blob();
+}
+
+function isJpegLikeMime(mime) {
+  const value = String(mime || "").toLowerCase();
+  return value === "image/jpeg" || value === "image/jpg";
+}
+
+async function getExifFromSource(file, settings, onNotice) {
+  if (!(settings?.preserveExif && settings?.format === "JPG")) return { exifBytes: null };
+  if (!isJpegLikeMime(file?.type)) return { exifBytes: null };
+
+  try {
+    const piexifModule = await import("piexifjs");
+    const piexif = piexifModule?.default || piexifModule;
+    const sourceDataUrl = await blobToDataUrl(file);
+    const exifObj = piexif.load(sourceDataUrl);
+    const hasGps = !!(exifObj?.GPS && Object.keys(exifObj.GPS).length);
+    if (hasGps) {
+      onNotice?.({
+        type: "warning",
+        message: "This image contains GPS location data. Enable Strip EXIF to remove it before sharing.",
+      });
+    }
+
+    return { exifBytes: piexif.dump(exifObj), piexif };
+  } catch {
+    return { exifBytes: null };
+  }
+}
+
+async function injectExifIfNeeded(blob, exifMeta, settings) {
+  if (!(settings?.preserveExif && settings?.format === "JPG")) return blob;
+  if (!exifMeta?.exifBytes || !exifMeta?.piexif) return blob;
+
+  try {
+    const outputDataUrl = await blobToDataUrl(blob);
+    const withExifDataUrl = exifMeta.piexif.insert(exifMeta.exifBytes, outputDataUrl);
+    const withExifBlob = await dataUrlToBlob(withExifDataUrl);
+    return withExifBlob.type ? withExifBlob : new Blob([withExifBlob], { type: mimeFromFormat(settings.format) });
+  } catch {
+    return blob;
+  }
 }
 
 function blobToObjectUrl(blob) {
@@ -185,7 +282,7 @@ async function encodeToTargetSize({
   return { blob: (await encodeAtQuality(1)), warning: "target_size_unreachable" };
 }
 
-async function processOnMainThread({ file, settings, crop, sourceWidth, sourceHeight, sourceUrl, onProgress }) {
+async function processOnMainThread({ file, settings, crop, sourceWidth, sourceHeight, sourceUrl, onProgress, onNotice }) {
   if (!supportsCanvasPath()) {
     throw new Error("Canvas processing is unavailable in this browser.");
   }
@@ -194,6 +291,7 @@ async function processOnMainThread({ file, settings, crop, sourceWidth, sourceHe
   const shouldRevoke = !sourceUrl;
 
   try {
+    const exifMeta = await getExifFromSource(file, settings, onNotice);
     onProgress?.({ stage: "Preparing source", progress: 25 });
     const img = await new Promise((resolve, reject) => {
       const fallback = new Image();
@@ -225,7 +323,7 @@ async function processOnMainThread({ file, settings, crop, sourceWidth, sourceHe
 
     onProgress?.({ stage: "Resizing", progress: 55 });
     await new Promise((resolve) => requestAnimationFrame(resolve));
-    let finalCanvas = drawHighQualityCanvas(sourceCanvas, targetSize.width, targetSize.height, createCanvas);
+    let finalCanvas = drawResizeCanvas(sourceCanvas, targetSize.width, targetSize.height, settings.resizeMode || "stretch", createCanvas);
 
     if (settings.format === "JPG") {
       finalCanvas = applyJpegBackground(finalCanvas, settings.jpgBackground);
@@ -251,6 +349,8 @@ async function processOnMainThread({ file, settings, crop, sourceWidth, sourceHe
     } else {
       blob = await encodeCanvas(finalCanvas, settings.format, settings.quality);
     }
+
+    blob = await injectExifIfNeeded(blob, exifMeta, settings);
 
     onProgress?.({ stage: "Done", progress: 100 });
     return {
@@ -389,7 +489,7 @@ function shouldPreferWorkerForSingle({ sourceWidth, sourceHeight, outputWidth, o
   return shouldUseWorker({ sourceWidth, sourceHeight, outputWidth, outputHeight }) || sourcePixels >= SMALL_IMAGE_PIXEL_LIMIT || outputPixels >= SMALL_IMAGE_PIXEL_LIMIT;
 }
 
-export async function processSingleImage({ file, settings, crop = null, sourceWidth, sourceHeight, sourceUrl = null, onProgress }) {
+export async function processSingleImage({ file, settings, crop = null, sourceWidth, sourceHeight, sourceUrl = null, onProgress, onNotice }) {
   const fallbackWidth = crop ? crop.w : sourceWidth || settings.width;
   const fallbackHeight = crop ? crop.h : sourceHeight || settings.height;
   const resolvedSize = getOutputDimensions(settings, fallbackWidth, fallbackHeight);
@@ -400,7 +500,9 @@ export async function processSingleImage({ file, settings, crop = null, sourceWi
     outputHeight: resolvedSize.height,
   });
 
-  if (workerFriendly && supportsWorkerCanvasPipeline()) {
+  const preserveExifOnJpeg = settings?.preserveExif && settings?.format === "JPG";
+
+  if (workerFriendly && !preserveExifOnJpeg && supportsWorkerCanvasPipeline()) {
     try {
       const result = await getWorkerPool().schedule(
         {
@@ -422,10 +524,10 @@ export async function processSingleImage({ file, settings, crop = null, sourceWi
     }
   }
 
-  return await processOnMainThread({ file, settings: { ...settings, width: resolvedSize.width, height: resolvedSize.height }, crop, sourceWidth, sourceHeight, sourceUrl, onProgress });
+  return await processOnMainThread({ file, settings: { ...settings, width: resolvedSize.width, height: resolvedSize.height }, crop, sourceWidth, sourceHeight, sourceUrl, onProgress, onNotice });
 }
 
-export async function processBulkImages({ files, settings, onItemProgress, onItemResult, onItemFail }) {
+export async function processBulkImages({ files, settings, isCancelledRef, onItemProgress, onItemResult, onItemFail }) {
   if (!files.length) return;
 
   const useWorkers = supportsWorkerCanvasPipeline();
@@ -434,6 +536,7 @@ export async function processBulkImages({ files, settings, onItemProgress, onIte
     const pool = getWorkerPool();
     await Promise.all(
       files.map(async (file, index) => {
+        if (isCancelledRef?.current) return;
         try {
           const result = await pool.schedule(
             {
@@ -457,6 +560,7 @@ export async function processBulkImages({ files, settings, onItemProgress, onIte
   }
 
   for (let index = 0; index < files.length; index += 1) {
+    if (isCancelledRef?.current) break;
     const file = files[index];
     try {
       onItemProgress?.(index, { stage: "Preparing source", progress: 10 });
@@ -485,7 +589,7 @@ export function downloadBlob(filename, blob) {
   anchor.href = url;
   anchor.download = filename;
   anchor.click();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  setTimeout(() => URL.revokeObjectURL(url), 10_000);
 }
 
 const CONVERT_MIME = {

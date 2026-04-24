@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Btn from "../components/Btn.jsx";
 import Card from "../components/Card.jsx";
 import ComparisonSlider from "../components/ComparisonSlider.jsx";
@@ -8,6 +8,8 @@ import { convertImage } from "../imagePipeline.js";
 import { bytesToText } from "../utils/imageUtils.js";
 import { getSupportedFormats } from "../utils/codecCapabilities.js";
 import { loadFromSession, saveToSession } from "../utils/sessionStore.js";
+import { generateId } from "../utils/generateId.js";
+import { iconProps, ToolTrashIcon } from "../components/AppIcons.jsx";
 
 export default function CompressTab({ onNotice }) {
   const [items, setItems] = useState([]);
@@ -32,24 +34,43 @@ export default function CompressTab({ onNotice }) {
     saveToSession("compress.format", format);
   }, [format]);
 
+  const urlsRef = useRef(new Set());
+
   useEffect(() => () => {
-    items.forEach((entry) => {
-      if (entry.originalUrl) URL.revokeObjectURL(entry.originalUrl);
-      if (entry.result?.outputUrl) URL.revokeObjectURL(entry.result.outputUrl);
-    });
-  }, [items]);
+    urlsRef.current.forEach((u) => URL.revokeObjectURL(u));
+    urlsRef.current.clear();
+  }, []);
 
   const addFiles = useCallback((list) => {
-    const next = Array.from(list || []).map((file) => ({
-      id: `${Date.now()}-${Math.random()}`,
-      file,
-      name: file.name,
-      originalUrl: URL.createObjectURL(file),
-      result: null,
-      status: "pending",
-      error: null,
-    }));
+    const next = Array.from(list || []).map((file) => {
+      const originalUrl = URL.createObjectURL(file);
+      urlsRef.current.add(originalUrl);
+      return {
+        id: generateId(),
+        file,
+        name: file.name,
+        originalUrl,
+        result: null,
+        status: "pending",
+        error: null,
+      };
+    });
     setItems((current) => [...current, ...next]);
+  }, []);
+
+  const removeItem = useCallback((id) => {
+    setItems((current) => {
+      const target = current.find((item) => item.id === id);
+      if (target?.originalUrl) {
+        URL.revokeObjectURL(target.originalUrl);
+        urlsRef.current.delete(target.originalUrl);
+      }
+      if (target?.result?.outputUrl) {
+        URL.revokeObjectURL(target.result.outputUrl);
+        urlsRef.current.delete(target.result.outputUrl);
+      }
+      return current.filter((item) => item.id !== id);
+    });
   }, []);
 
   const runCompress = useCallback(async () => {
@@ -60,6 +81,7 @@ export default function CompressTab({ onNotice }) {
         setItems((current) => current.map((x) => (x.id === item.id ? { ...x, status: "error", error: result.error } : x)));
       } else {
         const outputUrl = URL.createObjectURL(result.blob);
+        urlsRef.current.add(outputUrl);
         if (result.warning === "target_size_unreachable") {
           onNotice?.({ type: "info", message: "Could not reach exact target size — returned closest result." });
         }
@@ -127,7 +149,17 @@ export default function CompressTab({ onNotice }) {
         <Card key={item.id}>
           <div className="mb-2 flex items-center justify-between gap-2">
             <p className="truncate text-sm font-semibold text-on-surface">{item.name}</p>
-            {item.result && <p className="text-xs text-on-surface-variant">{bytesToText(item.file.size)} → {bytesToText(item.result.convertedSize)}</p>}
+            <div className="flex items-center gap-2">
+              {item.result && <p className="text-xs text-on-surface-variant">{bytesToText(item.file.size)} → {bytesToText(item.result.convertedSize)}</p>}
+              <button
+                type="button"
+                onClick={() => removeItem(item.id)}
+                className="text-xs text-on-surface-variant transition-colors hover:text-error"
+                aria-label={`Remove ${item.name}`}
+              >
+                <ToolTrashIcon {...iconProps} size={14} />
+              </button>
+            </div>
           </div>
           {item.result?.outputUrl ? (
             <ComparisonSlider

@@ -6,10 +6,9 @@ import { FORMAT_MIME } from "../constants/formats.js";
 import { processSingleImage, downloadBlob } from "../imagePipeline.js";
 import { bytesToText } from "../utils/imageUtils.js";
 import { blobRegistry } from "../utils/BlobRegistry.js";
+import { iconProps, ToolArrowSwapIcon, ToolFileDownIcon, ToolMaximizeIcon, ToolSparklesIcon } from "../components/AppIcons.jsx";
+import SectionHeader from "../components/SectionHeader.jsx";
 
-function Sec({ children, icon }) {
-  return <h3 className="text-lg font-headline font-bold text-on-surface mb-4 flex items-center gap-2">{icon && <span className="text-xl">{icon}</span>}{children}</h3>;
-}
 
 export default function OutputStep({ image, settings, crop, onBack, onReset, onNotice }) {
   const canvasRef = useRef(null);
@@ -96,6 +95,7 @@ export default function OutputStep({ image, settings, crop, onBack, onReset, onN
         sourceWidth: image.w,
         sourceHeight: image.h,
         sourceUrl: image.url,
+        onNotice,
         onProgress: ({ stage: nextStage, progress: nextProgress }) => {
           setStage(nextStage);
           setProgress(nextProgress);
@@ -138,12 +138,12 @@ export default function OutputStep({ image, settings, crop, onBack, onReset, onN
   };
 
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(280px,1fr))", gap: 18 }}>
+    <div className="grid grid-cols-[repeat(auto-fit,minmax(280px,1fr))] gap-[18px]">
       <Card>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-          <Sec>🖼️ Preview</Sec>
+        <div className="mb-3 flex items-center justify-between">
+          <SectionHeader><span className="inline-flex items-center gap-2"><ToolMaximizeIcon {...iconProps} size={16} />Preview</span></SectionHeader>
           {done && (
-            <div style={{ display: "flex", gap: 6 }}>
+            <div className="flex gap-1.5">
               {["before", "after"].map((v) => (
                 <Btn key={v} onClick={() => setView(v)} variant={view === v ? "primary" : "ghost"} small>
                   {v.charAt(0).toUpperCase() + v.slice(1)}
@@ -152,17 +152,17 @@ export default function OutputStep({ image, settings, crop, onBack, onReset, onN
             </div>
           )}
         </div>
-        <div style={{ background: "var(--c-gray)", borderRadius: 8, display: "flex", justifyContent: "center", minHeight: 160, padding: 8 }}>
-          <canvas ref={canvasRef} style={{ maxWidth: "100%", maxHeight: 300, borderRadius: 4, display: "block" }} />
+        <div className="flex min-h-40 justify-center rounded-lg bg-surface-container p-2">
+          <canvas ref={canvasRef} className="block max-h-[300px] max-w-full rounded" />
         </div>
         {processing && (
-          <div style={{ marginTop: 12 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: "var(--c-muted)", marginBottom: 4 }}>
+          <div className="mt-3">
+            <div className="mb-1 flex justify-between text-xs text-on-surface-variant">
               <span>{stage}</span>
               <span>{progress}%</span>
             </div>
-            <div style={{ height: 7, background: "var(--c-lb)", borderRadius: 4, overflow: "hidden" }}>
-              <div style={{ height: "100%", background: "var(--c-blue)", width: `${progress}%`, borderRadius: 4, transition: "width 0.12s" }} />
+            <div className="h-[7px] overflow-hidden rounded bg-outline-variant/40">
+              <div className="h-full rounded bg-primary transition-[width] duration-100" style={{ width: `${progress}%` }} />
             </div>
           </div>
         )}
@@ -170,7 +170,7 @@ export default function OutputStep({ image, settings, crop, onBack, onReset, onN
 
       {done && url && (
         <Card>
-          <Sec>↔ Compare</Sec>
+          <SectionHeader><span className="inline-flex items-center gap-2"><ToolArrowSwapIcon {...iconProps} size={16} />Compare</span></SectionHeader>
           <ComparisonSlider
             before={image.url}
             after={url}
@@ -185,32 +185,32 @@ export default function OutputStep({ image, settings, crop, onBack, onReset, onN
       )}
 
       <div>
-        <Card style={{ marginBottom: 12 }}>
-          <Sec>⚙ Summary</Sec>
+        <Card className="mb-3">
+          <SectionHeader><span className="inline-flex items-center gap-2"><ToolSparklesIcon {...iconProps} size={16} />Summary</span></SectionHeader>
           {[ ["Dimensions", `${settings.width}x${settings.height}px`], ["Format", settings.format], ["Crop", crop ? `${crop.w}x${crop.h} @ (${crop.x},${crop.y})` : "None"] ].map(([k, v]) => (
-            <div key={k} style={{ display: "flex", justifyContent: "space-between", padding: "5px 0", borderBottom: "1px solid var(--c-accent)", fontSize: 12 }}>
-              <span style={{ color: "var(--c-muted)" }}>{k}</span>
-              <strong style={{ color: "var(--c-navy)", maxWidth: 140, textAlign: "right", wordBreak: "break-all" }}>{v}</strong>
+            <div key={k} className="flex justify-between border-b border-outline-variant/40 py-[5px] text-xs">
+              <span className="text-on-surface-variant">{k}</span>
+              <strong className="max-w-[140px] break-all text-right text-on-surface">{v}</strong>
             </div>
           ))}
         </Card>
 
         {done && outBytes && (
-          <Card style={{ marginBottom: 12, background: "var(--c-success-card-bg)", border: "1px solid var(--c-success-card-border)" }}>
-            <div style={{ textAlign: "center" }}>
-              <p style={{ margin: "0 0 3px", fontSize: 11, color: "var(--c-muted)" }}>Output file size</p>
-              <p style={{ margin: 0, fontSize: 22, fontWeight: 800, color: "var(--c-success)" }}>{bytesToText(outBytes)}</p>
-              <p style={{ margin: "3px 0 0", fontSize: 11, color: "var(--c-muted)" }}>{procTime ? `${procTime}ms` : ""}</p>
+          <Card className="mb-3 border border-green-400/30 bg-green-400/10">
+            <div className="text-center">
+              <p className="mb-[3px] mt-0 text-xs text-on-surface-variant">Output file size</p>
+              <p className="m-0 text-[22px] font-extrabold text-green-400">{bytesToText(outBytes)}</p>
+              <p className="mb-0 mt-[3px] text-xs text-on-surface-variant">{procTime ? `${procTime}ms` : ""}</p>
             </div>
           </Card>
         )}
 
         {!done && (
           <>
-            <Btn onClick={process} disabled={processing} style={{ width: "100%", marginBottom: 8 }}>
-              {processing ? "Processing..." : "⚡ Process Image"}
+            <Btn onClick={process} disabled={processing} className="mb-2 w-full">
+              {processing ? "Processing..." : "Process Image"}
             </Btn>
-            {procError && <p style={{ color: "red", margin: "0 0 8px" }}>{procError}</p>}
+            {procError && <p className="mb-2 mt-0 text-error">{procError}</p>}
           </>
         )}
 
@@ -226,22 +226,22 @@ export default function OutputStep({ image, settings, crop, onBack, onReset, onN
                 if (outputBlob) downloadBlob(name, outputBlob);
               }}
               variant="success"
-              style={{ width: "100%", marginBottom: 8 }}
+              className="mb-2 w-full"
             >
-              ⬇ Download {settings.format}
+              <span className="inline-flex items-center gap-2"><ToolFileDownIcon {...iconProps} />Download {settings.format}</span>
             </Btn>
-            <Btn onClick={copyToClipboard} variant="secondary" style={{ width: "100%", marginBottom: 8 }}>
+            <Btn onClick={copyToClipboard} variant="secondary" className="mb-2 w-full">
               Copy To Clipboard
             </Btn>
           </>
         )}
 
-        <div style={{ display: "flex", gap: 6 }}>
-          <Btn onClick={onBack} variant="secondary" style={{ flex: 1 }}>
-            ← Edit
+        <div className="flex gap-1.5">
+          <Btn onClick={onBack} variant="secondary" className="flex-1">
+            Edit
           </Btn>
-          <Btn onClick={onReset} variant="secondary" style={{ flex: 1 }}>
-            ↺ New
+          <Btn onClick={onReset} variant="secondary" className="flex-1">
+            New
           </Btn>
         </div>
       </div>

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Btn from "./Btn.jsx";
-import { blobRegistry } from "../utils/BlobRegistry.js";
+import { iconProps, ToolArrowSwapIcon, ToolMaximizeIcon, ToolMinimizeIcon } from "./AppIcons.jsx";
 
 function clamp(value, min, max) {
   return Math.max(min, Math.min(max, value));
@@ -32,8 +32,6 @@ export default function ComparisonSlider({
   afterInfo = "",
 }) {
   const containerRef = useRef(null);
-  const beforeTagRef = useRef(`comparison-before-${Date.now()}-${Math.random().toString(36).slice(2)}`);
-  const afterTagRef = useRef(`comparison-after-${Date.now()}-${Math.random().toString(36).slice(2)}`);
   const [position, setPosition] = useState(defaultPosition);
   const [isDragging, setIsDragging] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -42,18 +40,6 @@ export default function ComparisonSlider({
   const [ready, setReady] = useState(false);
   const [compact, setCompact] = useState(false);
   const [isMobile, setIsMobile] = useState(() => globalThis.innerWidth < 640);
-
-  useEffect(() => {
-    const tag = beforeTagRef.current;
-    blobRegistry.replaceUrl(tag, before);
-    return () => blobRegistry.release(tag);
-  }, [before]);
-
-  useEffect(() => {
-    const tag = afterTagRef.current;
-    blobRegistry.replaceUrl(tag, after);
-    return () => blobRegistry.release(tag);
-  }, [after]);
 
   useEffect(() => {
     const onResize = () => {
@@ -70,6 +56,7 @@ export default function ComparisonSlider({
   useEffect(() => {
     let active = true;
     setReady(false);
+
     const loadDimensions = async () => {
       const [a, b] = await Promise.all([
         new Promise((resolve) => {
@@ -93,7 +80,7 @@ export default function ComparisonSlider({
       setReady(true);
     };
 
-    loadDimensions();
+    void loadDimensions();
 
     return () => {
       active = false;
@@ -218,19 +205,8 @@ export default function ComparisonSlider({
     >
       {!ready && <div className="absolute inset-0 animate-pulse bg-surface-container-high" />}
 
-      <img
-        src={before}
-        alt={beforeLabel}
-        className="absolute inset-0 h-full w-full object-contain"
-        draggable={false}
-      />
-      <img
-        src={after}
-        alt={afterLabel}
-        className="absolute inset-0 h-full w-full object-contain"
-        style={{ clipPath }}
-        draggable={false}
-      />
+      <img src={before} alt={beforeLabel} className="absolute inset-0 h-full w-full object-contain" draggable={false} />
+      <img src={after} alt={afterLabel} className="absolute inset-0 h-full w-full object-contain" style={{ clipPath }} draggable={false} />
 
       <div className="pointer-events-none absolute bg-white/90" style={dividerStyle} />
 
@@ -246,10 +222,10 @@ export default function ComparisonSlider({
         onPointerUp={handlePointerUp}
         onPointerCancel={handlePointerUp}
         onKeyDown={handleKeyDown}
-        className="absolute z-10 flex h-10 w-10 items-center justify-center rounded-full border-2 border-white/90 bg-white text-xs font-bold text-slate-700 shadow-lg"
+        className="absolute z-10 flex h-10 w-10 items-center justify-center rounded-full border-2 border-white/90 bg-white text-slate-700 shadow-lg"
         style={handleStyle}
       >
-        {mode === "horizontal" ? "◄►" : "▲▼"}
+        <ToolArrowSwapIcon {...iconProps} size={16} className={mode === "horizontal" ? "" : "rotate-90"} />
       </div>
 
       {!compact && (
@@ -272,10 +248,12 @@ export default function ComparisonSlider({
             onClick={() => setMode((value) => (value === "horizontal" ? "vertical" : "horizontal"))}
             aria-label="Toggle comparison orientation"
           >
-            {mode === "horizontal" ? "⇅" : "⇄"}
+            <ToolArrowSwapIcon {...iconProps} className={mode === "horizontal" ? "rotate-90" : ""} />
           </Btn>
         )}
-        <Btn small variant="secondary" onClick={() => setIsFullscreen(true)} aria-label="Open comparison fullscreen">⤢</Btn>
+        <Btn small variant="secondary" onClick={() => setIsFullscreen(true)} aria-label="Open comparison fullscreen">
+          <ToolMaximizeIcon {...iconProps} />
+        </Btn>
       </div>
     </div>
   );
@@ -287,13 +265,8 @@ export default function ComparisonSlider({
       <div className="h-[90vh] w-[90vw] max-w-[1200px]">
         {slider}
       </div>
-      <Btn
-        variant="secondary"
-        onClick={() => setIsFullscreen(false)}
-        aria-label="Close fullscreen"
-        className="absolute right-4 top-4"
-      >
-        Close
+      <Btn variant="secondary" onClick={() => setIsFullscreen(false)} aria-label="Close fullscreen" className="absolute right-4 top-4">
+        <ToolMinimizeIcon {...iconProps} />
       </Btn>
     </div>
   );

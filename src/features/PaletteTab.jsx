@@ -34,6 +34,7 @@ export default function PaletteTab({ onNotice }) {
   const [colors, setColors] = useState([]);
   const [highlightIndex, setHighlightIndex] = useState(-1);
   const [paletteName, setPaletteName] = useState("Untitled Palette");
+  const [draggedIndex, setDraggedIndex] = useState(null);
 
   const processFile = (file) => {
     if (!file) return;
@@ -49,6 +50,36 @@ export default function PaletteTab({ onNotice }) {
     setColors(extracted);
     setPaletteName(generatePaletteName(extracted));
   }, [count, includeDark, includeLight, quality, source?.url]);
+
+  const handleColorChange = (index, newHex) => {
+    setColors((prevColors) => {
+      const updated = [...prevColors];
+      updated[index] = { ...updated[index], hex: newHex };
+      return updated;
+    });
+  };
+
+  const handleDragStart = (e, index) => {
+    setDraggedIndex(index);
+    e.dataTransfer.effectAllowed = "move";
+  };
+
+  const handleDragOver = (e) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+  };
+
+  const handleDrop = (e, targetIndex) => {
+    e.preventDefault();
+    if (draggedIndex === null || draggedIndex === targetIndex) return;
+
+    const newColors = [...colors];
+    const draggedColor = newColors[draggedIndex];
+    newColors.splice(draggedIndex, 1);
+    newColors.splice(targetIndex, 0, draggedColor);
+    setColors(newColors);
+    setDraggedIndex(null);
+  };
 
   useEffect(() => {
     const onShortcut = (event) => {
@@ -122,10 +153,16 @@ export default function PaletteTab({ onNotice }) {
                 key={`${color.hex}-${index}`}
                 color={color}
                 highlighted={highlightIndex === index}
+                onSelect={() => setHighlightIndex(index)}
                 onCopy={async (value) => {
                   await navigator.clipboard.writeText(value);
                   onNotice?.({ type: "info", message: `${value} copied.` });
                 }}
+                onColorChange={handleColorChange}
+                onDragStart={handleDragStart}
+                onDragOver={handleDragOver}
+                onDrop={handleDrop}
+                index={index}
               />
             ))}
           </div>

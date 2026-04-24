@@ -14,3 +14,20 @@ export function loadFromSession(key, fallback) {
     return fallback;
   }
 }
+
+export function saveToLocal(key, value) {
+  try {
+    globalThis.localStorage.setItem(key, JSON.stringify(value));
+  } catch {
+    // ignore storage failures (private browsing, storage full, etc.)
+  }
+}
+
+export function loadFromLocal(key, fallback) {
+  try {
+    const raw = globalThis.localStorage.getItem(key);
+    return raw !== null ? JSON.parse(raw) : fallback;
+  } catch {
+    return fallback;
+  }
+}

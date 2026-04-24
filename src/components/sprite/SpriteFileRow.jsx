@@ -1,4 +1,5 @@
 import DragHandle from "../DragHandle.jsx";
+import { iconProps, ToolXIcon } from "../AppIcons.jsx";
 
 export default function SpriteFileRow({ item, index, onRemove, dragApi }) {
   return (
@@ -16,7 +17,7 @@ export default function SpriteFileRow({ item, index, onRemove, dragApi }) {
         <p className="truncate text-sm text-on-surface">{item.name}</p>
         <p className="text-xs text-on-surface-variant">{item.width}×{item.height} · ({item.x || 0}, {item.y || 0})</p>
       </div>
-      <button type="button" onClick={() => onRemove(index)} className="rounded-full p-1 text-error hover:bg-error/10" aria-label={`Remove ${item.name}`}>×</button>
+      <button type="button" onClick={() => onRemove(index)} className="rounded-full p-1 text-error hover:bg-error/10" aria-label={`Remove ${item.name}`}><ToolXIcon {...iconProps} size={14} /></button>
     </div>
   );
 }

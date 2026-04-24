@@ -1,3 +1,5 @@
+import { iconProps, ToolXIcon } from "../AppIcons.jsx";
+
 export default function PdfPagePreview({ page, index, selected, onSelect, onRemove }) {
   return (
     <button
@@ -17,7 +19,7 @@ export default function PdfPagePreview({ page, index, selected, onSelect, onRemo
         aria-label={`Remove ${page.name}`}
         className="absolute right-2 top-2 rounded-full bg-black/50 px-1.5 text-xs text-white"
       >
-        ×
+        <ToolXIcon {...iconProps} size={14} />
       </button>
     </button>
   );

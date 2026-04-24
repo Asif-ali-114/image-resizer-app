@@ -7,12 +7,27 @@ import PdfSettingsPanel from "../components/pdf/PdfSettingsPanel.jsx";
 import PdfPageSorter from "../components/pdf/PdfPageSorter.jsx";
 import { calculateImagePosition, sanitizePdfFilename } from "../utils/pdfUtils.js";
 import useDragToReorder from "../hooks/useDragToReorder.js";
+import { generateId } from "../utils/generateId.js";
+import { iconProps, ToolCheckIcon, ToolDownloadIcon, ToolImagePlusIcon } from "../components/AppIcons.jsx";
 
 function pageSizeToFormat(pageSize) {
   if (pageSize === "a3") return "a3";
   if (pageSize === "letter") return "letter";
   if (pageSize === "legal") return "legal";
   return "a4";
+}
+
+function mimeToJsPdfFormat(mimeType) {
+  const map = {
+    "image/jpeg": "JPEG",
+    "image/jpg": "JPEG",
+    "image/png": "PNG",
+    "image/webp": "WEBP",
+    "image/gif": "GIF",
+    "image/bmp": "BMP",
+    "image/tiff": "PNG",
+  };
+  return map[mimeType?.toLowerCase()] || "PNG";
 }
 
 export default function PdfTab({ onNotice }) {
@@ -36,7 +51,7 @@ export default function PdfTab({ onNotice }) {
 
   const addFiles = (list) => {
     const additions = Array.from(list || []).map((file) => ({
-      id: `${Date.now()}-${Math.random()}`,
+      id: generateId(),
       file,
       name: file.name,
       url: URL.createObjectURL(file),
@@ -65,7 +80,8 @@ export default function PdfTab({ onNotice }) {
       const pageW = doc.internal.pageSize.getWidth();
       const pageH = doc.internal.pageSize.getHeight();
       const pos = calculateImagePosition({ pageW, pageH, imageW: img.width, imageH: img.height, margin: settings.margin, mode: settings.fitMode });
-      doc.addImage(page.url, "PNG", pos.x, pos.y, pos.w, pos.h);
+      const imgFormat = mimeToJsPdfFormat(page.file?.type);
+      doc.addImage(page.url, imgFormat, pos.x, pos.y, pos.w, pos.h);
       setProgress((current) => ({ ...current, done: i + 1 }));
     }
 
@@ -128,15 +144,15 @@ export default function PdfTab({ onNotice }) {
 
       <Card>
         <div className="flex flex-wrap gap-2">
-          <Btn onClick={() => inputRef.current?.click()} aria-label="Add images to PDF">+ Add More Images</Btn>
+          <Btn onClick={() => inputRef.current?.click()} aria-label="Add images to PDF"><span className="inline-flex items-center gap-2"><ToolImagePlusIcon {...iconProps} size={16} />Add More Images</span></Btn>
           <Btn variant="secondary" onClick={() => setUrlOpen(true)} aria-label="Import image URL for PDF">Import from URL</Btn>
           <Btn variant="ghost" onClick={() => {
             pages.forEach((item) => item.url && URL.revokeObjectURL(item.url));
             setPages([]);
             setReadyPdf(null);
           }} aria-label="Clear PDF pages">Clear All</Btn>
-          <Btn onClick={generatePdf} disabled={!pages.length || making} aria-label="Generate PDF">{making ? "Generating..." : "Generate PDF →"}</Btn>
-          {readyPdf && <Btn variant="success" onClick={downloadPdf} aria-label="Download generated PDF">↓ Download PDF</Btn>}
+          <Btn onClick={generatePdf} disabled={!pages.length || making} aria-label="Generate PDF">{making ? "Generating..." : "Generate PDF"}</Btn>
+          {readyPdf && <Btn variant="success" onClick={downloadPdf} aria-label="Download generated PDF"><span className="inline-flex items-center gap-2"><ToolDownloadIcon {...iconProps} size={16} />Download PDF</span></Btn>}
         </div>
 
         {making && (
@@ -148,7 +164,7 @@ export default function PdfTab({ onNotice }) {
           </div>
         )}
 
-        {summary && <p className="mt-3 text-sm font-semibold text-on-surface">✓ PDF ready · {summary}</p>}
+        {summary && <p className="mt-3 inline-flex items-center gap-2 text-sm font-semibold text-on-surface"><ToolCheckIcon {...iconProps} size={16} />PDF ready · {summary}</p>}
       </Card>
 
       <input ref={inputRef} type="file" accept="image/*" multiple className="hidden" onChange={(e) => addFiles(e.target.files)} />

@@ -4,16 +4,9 @@ import { loadImageFromUrl } from "../utils/imageUtils.js";
 import Btn from "../components/Btn.jsx";
 import UrlImportModal from "../components/UrlImportModal.jsx";
 import { blobRegistry } from "../utils/BlobRegistry.js";
+import { iconProps, ToolClipboardPasteIcon, ToolImagePlusIcon } from "../components/AppIcons.jsx";
+import AlertBox from "../components/AlertBox.jsx";
 
-function ErrBox({ msg }) {
-  if (!msg) return null;
-  return (
-    <div className="mt-4 p-4 bg-error/10 border border-error/30 rounded-lg text-error text-sm font-medium flex items-start gap-3">
-      <span className="text-lg mt-0.5">⚠</span>
-      <span>{msg}</span>
-    </div>
-  );
-}
 
 export default function UploadStep({ onUpload }) {
   const [dragging, setDragging] = useState(false);
@@ -101,7 +94,9 @@ export default function UploadStep({ onUpload }) {
             : "border-primary bg-primary/2 hover:border-primary/80 hover:bg-primary/3"
         }`}
       >
-        <div className="text-5xl md:text-6xl mb-4">🖼️</div>
+        <div className="mb-4 inline-flex h-16 w-16 items-center justify-center rounded-2xl border border-primary/20 bg-primary/10 text-primary md:h-20 md:w-20">
+          <ToolImagePlusIcon {...iconProps} size={30} />
+        </div>
         <h2 className="text-xl md:text-2xl font-headline font-bold text-on-surface mb-2">Drop your image here</h2>
         <p className="text-on-surface-variant text-sm md:text-base mb-6">
           or click to browse · paste with <kbd className="px-2 py-1 bg-surface-container rounded text-xs font-mono">Ctrl+V</kbd>
@@ -139,7 +134,7 @@ export default function UploadStep({ onUpload }) {
         </div>
       )}
 
-      <ErrBox msg={error} />
+      <AlertBox msg={error} />
 
       <input
         ref={inputRef}
@@ -150,7 +145,7 @@ export default function UploadStep({ onUpload }) {
       />
 
       <div className="mt-6 md:mt-8 p-4 bg-primary/5 border border-primary/20 rounded-lg text-sm text-on-surface-variant">
-        <strong className="text-primary">⌨ Shortcuts:</strong> Ctrl+V paste · Tab navigate · Enter confirm
+        <strong className="inline-flex items-center gap-2 text-primary"><ToolClipboardPasteIcon {...iconProps} size={14} />Shortcuts:</strong> Ctrl+V paste · Tab navigate · Enter confirm
       </div>
 
       <UrlImportModal

@@ -17,7 +17,18 @@ import useRecentTools from "./hooks/useRecentTools.js";
 import { useTheme } from "./context/ThemeContext.jsx";
 import { ToastProvider } from "./context/ToastContext.jsx";
 import { CommandPaletteProvider } from "./context/CommandPaletteContext.jsx";
-import { loadFromSession, saveToSession } from "./utils/sessionStore.js";
+import { loadFromLocal, loadFromSession, saveToLocal, saveToSession } from "./utils/sessionStore.js";
+import {
+  ToolBoxesIcon,
+  ToolFileTextIcon,
+  ToolImageIcon,
+  ToolKeyboardIcon,
+  ToolLayoutGridIcon,
+  ToolMoonIcon,
+  ToolPaletteIcon,
+  ToolRefreshIcon,
+  ToolSparklesIcon,
+} from "./components/AppIcons.jsx";
 
 const SingleTab = lazy(() => import("./features/SingleTab.jsx"));
 const BulkTab = lazy(() => import("./features/BulkTab.jsx"));
@@ -29,40 +40,36 @@ const SpriteTab = lazy(() => import("./features/SpriteTab.jsx"));
 const PaletteTab = lazy(() => import("./features/PaletteTab.jsx"));
 const LogoCreatorTab = lazy(() => import("./features/LogoCreator/index.jsx"));
 
-const ICON_COLORS = {
-  single: "rgb(var(--color-primary))",
-  bulk: "#F97316",
-  convert: "#22C55E",
-  compress: "#22C55E",
-  editor: "#A855F7",
-  pdf: "#EF4444",
-  sprite: "#F59E0B",
-  palette: "#EC4899",
-  logo: "#0EA5E9",
-  url: "#14B8A6",
-  action: "rgb(var(--color-on-surface-variant))",
-};
-
 const TOOL_META = [
-  { id: "single", label: "Single Resize", description: "Resize and crop one image at a time", icon: "🖼", aliases: ["resize", "photo"], color: ICON_COLORS.single },
-  { id: "bulk", label: "Bulk Resize", description: "Process hundreds of images at once", icon: "📦", aliases: ["resize", "batch", "photo"], color: ICON_COLORS.bulk },
-  { id: "convert", label: "Image Converter", description: "Convert between JPEG PNG WebP and more", icon: "↻", aliases: ["convert", "compress", "export"], color: ICON_COLORS.convert },
-  { id: "compress", label: "Image Compressor", description: "Reduce file size while preserving quality", icon: "🗜", aliases: ["compress", "convert", "photo"], color: ICON_COLORS.convert },
-  { id: "editor", label: "Image Editor", description: "Brightness, contrast, filters and transforms", icon: "▤", aliases: ["resize", "compress", "photo"], color: ICON_COLORS.editor },
-  { id: "pdf", label: "Image to PDF", description: "Combine images into one PDF document", icon: "📄", aliases: ["pdf", "export"], color: ICON_COLORS.pdf },
-  { id: "sprite", label: "Sprite Sheet", description: "Pack icons into one sprite sheet", icon: "⊞", aliases: ["sprite", "export"], color: ICON_COLORS.sprite },
-  { id: "palette", label: "Color Palette", description: "Extract dominant colors from any image", icon: "🎨", aliases: ["palette", "export", "photo"], color: ICON_COLORS.palette },
-  { id: "logo", label: "Logo Creator", description: "Create logos, banners and social graphics", icon: "✦", aliases: ["logo", "design", "canvas", "brand", "poster", "thumbnail"], color: ICON_COLORS.logo },
+  { id: "single", label: "Single Resize", description: "Resize and crop one image at a time", icon: ToolImageIcon, aliases: ["resize", "photo"] },
+  { id: "bulk", label: "Bulk Resize", description: "Process hundreds of images at once", icon: ToolBoxesIcon, aliases: ["resize", "batch", "photo"] },
+  { id: "convert", label: "Image Converter", description: "Convert between JPEG PNG WebP and more", icon: ToolRefreshIcon, aliases: ["convert", "compress", "export"] },
+  { id: "compress", label: "Image Compressor", description: "Reduce file size while preserving quality", icon: ToolSparklesIcon, aliases: ["compress", "convert", "photo"] },
+  { id: "editor", label: "Image Editor", description: "Brightness, contrast, filters and transforms", icon: ToolLayoutGridIcon, aliases: ["resize", "compress", "photo"] },
+  { id: "pdf", label: "Image to PDF", description: "Combine images into one PDF document", icon: ToolFileTextIcon, aliases: ["pdf", "export"] },
+  { id: "sprite", label: "Sprite Sheet", description: "Pack icons into one sprite sheet", icon: ToolLayoutGridIcon, aliases: ["sprite", "export"] },
+  { id: "palette", label: "Color Palette", description: "Extract dominant colors from any image", icon: ToolPaletteIcon, aliases: ["palette", "export", "photo"] },
+  { id: "logo", label: "Logo Creator", description: "Create logos, banners and social graphics", icon: ToolSparklesIcon, aliases: ["logo", "design", "canvas", "brand", "poster", "thumbnail"] },
 ];
 
 const ACTION_META = [
-  { id: "toggle-theme", label: "Toggle Dark Mode", description: "Switch between light and dark", icon: "🌙", aliases: ["theme", "dark", "light"], color: ICON_COLORS.action, kind: "action" },
-  { id: "open-shortcuts", label: "Keyboard Shortcuts", description: "View all keyboard shortcuts", icon: "⌨", aliases: ["shortcuts", "keys"], color: ICON_COLORS.action, kind: "action" },
+  { id: "toggle-theme", label: "Toggle Dark Mode", description: "Switch between light and dark", icon: ToolMoonIcon, aliases: ["theme", "dark", "light"], kind: "action" },
+  { id: "open-shortcuts", label: "Keyboard Shortcuts", description: "View all keyboard shortcuts", icon: ToolKeyboardIcon, aliases: ["shortcuts", "keys"], kind: "action" },
 ];
+
+const UI_MODES = ["classic", "neo", "nova"];
+
+function getInitialUiMode() {
+  const saved = loadFromLocal("ui.mode", "classic");
+  return UI_MODES.includes(saved) ? saved : "classic";
+}
 
 function AppContent() {
   const [activeTool, setActiveTool] = useState(() => loadFromSession("lastActiveTab", "single"));
+  const [uiMode, setUiMode] = useState(() => getInitialUiMode());
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
+  const [singlePrefill, setSinglePrefill] = useState(null);
+  const [bulkPrefill, setBulkPrefill] = useState(null);
   const logoCanvasJsonRef = useRef(null);
   const { toggleTheme } = useTheme();
   useScrollLock();
@@ -78,6 +85,12 @@ function AppContent() {
       saveToSession("lastActiveTab", activeTool);
     }
   }, [activeTool]);
+
+  useEffect(() => {
+    saveToLocal("ui.mode", uiMode);
+    const root = document.documentElement;
+    root.setAttribute("data-ui-mode", uiMode);
+  }, [uiMode]);
 
   const openTool = useCallback((toolId) => {
     setActiveTool(toolId);
@@ -99,6 +112,38 @@ function AppContent() {
     if (actionId === "toggle-theme") toggleTheme();
     if (actionId === "open-shortcuts") setShortcutsOpen(true);
   }, [toggleTheme]);
+
+  const toggleUiMode = useCallback(() => {
+    setUiMode((current) => {
+      const currentIndex = UI_MODES.indexOf(current);
+      const nextIndex = currentIndex >= 0 ? (currentIndex + 1) % UI_MODES.length : 0;
+      return UI_MODES[nextIndex];
+    });
+  }, []);
+
+  const setUiModeSafe = useCallback((nextMode) => {
+    setUiMode(UI_MODES.includes(nextMode) ? nextMode : "classic");
+  }, []);
+
+  const handleFileDrop = useCallback((files, suggestedTool) => {
+    const imageFiles = Array.from(files || []).filter((file) => file.type?.startsWith("image/"));
+    if (!imageFiles.length) {
+      onNotice?.({ type: "error", message: "Please drop image files only." });
+      return;
+    }
+
+    if (suggestedTool === "single") {
+      const first = imageFiles[0];
+      setSinglePrefill({ id: `single-drop-${Date.now()}`, file: first });
+      setActiveTool("single");
+      pushRecentTool("single");
+      return;
+    }
+
+    setBulkPrefill({ id: `bulk-drop-${Date.now()}`, files: imageFiles });
+    setActiveTool("bulk");
+    pushRecentTool("bulk");
+  }, [onNotice, pushRecentTool]);
 
   const dispatchToolShortcut = useCallback((action) => {
     if (!activeTool) return;
@@ -152,15 +197,15 @@ function AppContent() {
   );
 
   const toolPanels = useMemo(() => [
-    { id: "single", node: <SingleTab onNotice={onNotice} onOpenTool={openTool} /> },
-    { id: "bulk", node: <BulkTab onNotice={onNotice} isActive={activeTool === "bulk"} /> },
+    { id: "single", node: <SingleTab onNotice={onNotice} onOpenTool={openTool} prefillFile={singlePrefill} /> },
+    { id: "bulk", node: <BulkTab onNotice={onNotice} isActive={activeTool === "bulk"} prefillFiles={bulkPrefill} /> },
     { id: "convert", node: <ConvertTab onNotice={onNotice} isActive={activeTool === "convert"} /> },
     { id: "compress", node: <CompressTab onNotice={onNotice} isActive={activeTool === "compress"} /> },
     { id: "editor", node: <EditorTab onNotice={onNotice} isActive={activeTool === "editor"} /> },
     { id: "pdf", node: <PdfTab onNotice={onNotice} isActive={activeTool === "pdf"} /> },
     { id: "sprite", node: <SpriteTab onNotice={onNotice} isActive={activeTool === "sprite"} /> },
     { id: "palette", node: <PaletteTab onNotice={onNotice} isActive={activeTool === "palette"} /> },
-  ], [activeTool, onNotice, openTool]);
+  ], [activeTool, bulkPrefill, onNotice, openTool, singlePrefill]);
 
   const logoPanel = (
     <LogoCreatorTab
@@ -173,7 +218,7 @@ function AppContent() {
 
   return (
     <div
-      className={`app-container app-shell bg-surface text-on-surface font-body ${activeTool ? "has-subnav" : ""}`}
+      className={`app-container app-shell bg-surface text-on-surface font-body ${activeTool ? "has-subnav" : ""} ui-${uiMode}`}
     >
       <TopBar
         activeTool={activeTool}
@@ -181,13 +226,24 @@ function AppContent() {
         onBackHome={goHome}
         onOpenPalette={openPalette}
         onOpenShortcuts={() => setShortcutsOpen(true)}
+        uiMode={uiMode}
+        onToggleUiMode={toggleUiMode}
+        onSetUiMode={setUiModeSafe}
       />
 
       <div className="app-body">
         {activeTool !== "logo" && (
           <main className="app-main flex-1 min-h-0 min-w-0 overflow-hidden">
             <div className="canvas-scroll-area flex h-full min-h-0 min-w-0 flex-1 flex-col">
-              {!activeTool && <HomeScreen tools={TOOL_META} onOpenTool={openTool} />}
+              {!activeTool && (
+                <HomeScreen
+                  tools={TOOL_META}
+                  onOpenTool={openTool}
+                  onFileDrop={handleFileDrop}
+                  onInvalidDrop={() => onNotice?.({ type: "error", message: "Please drop image files only." })}
+                  uiMode={uiMode}
+                />
+              )}
 
               {activeTool && (
                 <ToolView activeToolLabel={activeToolMeta?.label} onBackHome={goHome}>

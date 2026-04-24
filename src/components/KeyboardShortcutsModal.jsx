@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import Btn from "./Btn.jsx";
 import Card from "./Card.jsx";
+import { iconProps, ToolKeyboardIcon, ToolXIcon } from "./AppIcons.jsx";
 
 function Badge({ text }) {
   return <span className="ui-badge font-mono">{text}</span>;
@@ -116,14 +117,14 @@ export default function KeyboardShortcutsModal({ open, onClose }) {
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-[130] bg-black/50" onClick={onClose} role="presentation">
+    <div className="fixed inset-0 z-[130] bg-black/40 backdrop-blur-[2px]" onClick={onClose} role="presentation">
       <div
         className="mx-auto mt-8 max-h-[80vh] w-[calc(100%-24px)] max-w-[640px] overflow-y-auto rounded-2xl border border-outline-variant/40 bg-surface p-4 shadow-card md:mt-20"
         onClick={(event) => event.stopPropagation()}
       >
         <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-lg font-semibold">⌨ Keyboard Shortcuts</h2>
-          <Btn small variant="secondary" onClick={onClose} aria-label="Close keyboard shortcuts">×</Btn>
+          <h2 className="inline-flex items-center gap-2 text-lg font-semibold"><ToolKeyboardIcon {...iconProps} />Keyboard Shortcuts</h2>
+          <Btn small variant="secondary" onClick={onClose} aria-label="Close keyboard shortcuts"><ToolXIcon {...iconProps} /></Btn>
         </div>
 
         {SECTIONS.map((section) => (

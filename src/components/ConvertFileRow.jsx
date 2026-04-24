@@ -4,29 +4,26 @@ import FormatBadge from "./FormatBadge.jsx";
 import DownloadButton from "./DownloadButton.jsx";
 import { OUTPUT_FORMATS, formatLabel, getFormatMeta, needsBackgroundFill } from "../utils/convertUtils.js";
 import { bytesToText } from "../utils/imageUtils.js";
+import { iconProps, ToolAlertIcon, ToolArrowSwapIcon, ToolCheckIcon, ToolRefreshIcon, ToolXIcon } from "./AppIcons.jsx";
 
 function StatusIcon({ status }) {
   if (status === "converting") {
-    return <span className="convert-spin inline-block h-4 w-4 rounded-full border-2 border-primary border-t-transparent" aria-label="Converting" />;
+    return <span className="convert-spin inline-flex h-4 w-4 items-center justify-center text-primary" aria-label="Converting"><ToolRefreshIcon {...iconProps} size={14} /></span>;
   }
 
   if (status === "done") {
     return (
-      <span className="convert-pop inline-flex h-5 w-5 items-center justify-center rounded-full bg-emerald-500/15 text-emerald-500" aria-label="Done">
-        ✓
-      </span>
+      <span className="convert-pop inline-flex h-5 w-5 items-center justify-center rounded-full bg-emerald-500/15 text-emerald-500" aria-label="Done"><ToolCheckIcon {...iconProps} size={14} /></span>
     );
   }
 
   if (status === "error") {
     return (
-      <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-error/10 text-error" aria-label="Error">
-        ×
-      </span>
+      <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-error/10 text-error" aria-label="Error"><ToolAlertIcon {...iconProps} size={14} /></span>
     );
   }
 
-  return <span className="text-on-surface-variant" aria-label="Pending">◷</span>;
+  return <span className="text-on-surface-variant" aria-label="Pending"><ToolRefreshIcon {...iconProps} size={14} /></span>;
 }
 
 function sizeDiffText(originalSize, convertedSize) {
@@ -63,7 +60,7 @@ export default function ConvertFileRow({
             <StatusIcon status={item.status} />
             <p className="max-w-[240px] truncate text-sm font-semibold text-on-surface" title={item.name}>{item.name}</p>
             <FormatBadge format={item.srcFormat} />
-            <span className="text-on-surface-variant">→</span>
+            <span className="text-on-surface-variant" aria-hidden="true"><ToolArrowSwapIcon {...iconProps} size={14} /></span>
             <label className="inline-flex items-center gap-2 text-xs text-on-surface-variant">
               <span className="sr-only">Output format for {item.name}</span>
               <span className="inline-block h-2.5 w-2.5 rounded-full" style={{ background: getFormatMeta(item.outputFormat)?.color || "#6B7280" }} />
@@ -118,7 +115,7 @@ export default function ConvertFileRow({
           className="rounded-full p-1 text-error transition-colors hover:bg-error/10"
           aria-label={`Remove ${item.name}`}
         >
-          ×
+          <ToolXIcon {...iconProps} size={14} />
         </button>
       </div>
 

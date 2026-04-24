@@ -5,30 +5,10 @@ import { PRESETS, ICONS, SIZE_PRESETS } from "../constants/presets.js";
 import { LOCAL_STORAGE_SETTINGS_KEY } from "../constants/formats.js";
 import { sanitizeSettings } from "../utils/sanitizeSettings.js";
 import { isCodecSupported } from "../utils/codecCapabilities.js";
+import { iconProps, ToolLockIcon, ToolUnlockIcon } from "../components/AppIcons.jsx";
+import SectionHeader from "../components/SectionHeader.jsx";
+import AlertBox from "../components/AlertBox.jsx";
 
-function Sec({ children, icon }) {
-  return <h3 className="text-lg font-headline font-bold text-on-surface mb-4 flex items-center gap-2">{icon && <span className="text-xl">{icon}</span>}{children}</h3>;
-}
-
-function ErrBox({ msg }) {
-  if (!msg) return null;
-  return (
-    <div className="mt-4 p-4 bg-error/10 border border-error/30 rounded-lg text-error text-sm font-medium flex items-start gap-3">
-      <span className="text-lg mt-0.5">⚠</span>
-      <span>{msg}</span>
-    </div>
-  );
-}
-
-function WarnBox({ msg }) {
-  if (!msg) return null;
-  return (
-    <div className="mt-4 p-4 bg-warn/10 border border-warn/30 rounded-lg text-warn text-sm font-medium flex items-start gap-3">
-      <span className="text-lg mt-0.5">!</span>
-      <span>{msg}</span>
-    </div>
-  );
-}
 
 export default function ResizeStep({ image, onNext, onBack }) {
   const formatMap = useMemo(() => ({ JPG: "jpeg", PNG: "png", WebP: "webp" }), []);
@@ -61,12 +41,14 @@ export default function ResizeStep({ image, onNext, onBack }) {
   const [format, setFormat] = useState(saved.format || "JPG");
   const [quality, setQuality] = useState(saved.quality || 85);
   const [jpgBackground, setJpgBackground] = useState(saved.jpgBackground || "#ffffff");
+  const [stripExif, setStripExif] = useState(true);
   const [sizeMode, setSizeMode] = useState("quality");
   const [targetKB, setTargetKB] = useState(200);
   const [activePlatform, setActivePlatform] = useState(null);
   const [activePreset, setActivePreset] = useState(null);
   const [error, setError] = useState("");
   const [warn, setWarn] = useState("");
+  const [resizeMode, setResizeMode] = useState("stretch");
 
   useEffect(() => {
     if (!supportedResizeFormats.length) return;
@@ -134,9 +116,9 @@ export default function ResizeStep({ image, onNext, onBack }) {
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6 w-full">
       <div className="lg:col-span-2 space-y-4 md:space-y-6">
-        <Card style={{ marginBottom: 14 }}>
-          <Sec>📐 Dimensions</Sec>
-          <div style={{ display: "flex", gap: 6, marginBottom: 14 }}>
+        <Card className="mb-3.5">
+          <SectionHeader>📐 Dimensions</SectionHeader>
+          <div className="mb-3.5 flex gap-1.5">
             {["pixel", "percent"].map((m) => (
               <Btn key={m} onClick={() => setMode(m)} variant={mode === m ? "primary" : "ghost"} small>
                 {m === "pixel" ? "Pixels (px)" : "Scale (%)"}
@@ -144,58 +126,45 @@ export default function ResizeStep({ image, onNext, onBack }) {
             ))}
           </div>
           {mode === "pixel" ? (
-            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <div className="flex items-center gap-2.5">
               <div>
-                <label style={{ fontSize: 11, color: "var(--c-muted)", display: "block", marginBottom: 4 }}>Width (px)</label>
-                <input type="number" value={width} min={10} onChange={(e) => setW(e.target.value)} style={{ width: 96, padding: "7px 10px", border: "1px solid var(--c-blue)", borderRadius: 6, fontSize: 14 }} />
+                <label className="mb-1 block text-xs text-on-surface-variant">Width (px)</label>
+                <input type="number" value={width} min={10} onChange={(e) => setW(e.target.value)} className="w-24 rounded-md border border-primary px-2.5 py-[7px] text-sm" />
               </div>
               <button
                 onClick={() => setLock(!lock)}
                 title={lock ? "Locked" : "Unlocked"}
-                style={{
-                  width: 32,
-                  height: 32,
-                  borderRadius: "50%",
-                  border: "2px solid var(--c-blue)",
-                  background: lock ? "var(--c-navy)" : "var(--c-white)",
-                  color: lock ? "var(--c-white)" : "var(--c-blue)",
-                  cursor: "pointer",
-                  fontSize: 14,
-                  marginTop: 16,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                }}
+                className={`mt-4 flex h-8 w-8 items-center justify-center rounded-full border-2 border-primary text-sm ${lock ? "bg-primary text-on-primary" : "bg-surface text-primary"}`}
               >
-                {lock ? "🔒" : "🔓"}
+                {lock ? <ToolLockIcon {...iconProps} size={14} /> : <ToolUnlockIcon {...iconProps} size={14} />}
               </button>
               <div>
-                <label style={{ fontSize: 11, color: "var(--c-muted)", display: "block", marginBottom: 4 }}>Height (px)</label>
-                <input type="number" value={height} min={10} onChange={(e) => setH(e.target.value)} style={{ width: 96, padding: "7px 10px", border: "1px solid var(--c-blue)", borderRadius: 6, fontSize: 14 }} />
+                <label className="mb-1 block text-xs text-on-surface-variant">Height (px)</label>
+                <input type="number" value={height} min={10} onChange={(e) => setH(e.target.value)} className="w-24 rounded-md border border-primary px-2.5 py-[7px] text-sm" />
               </div>
             </div>
           ) : (
             <div>
-              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
-                <label style={{ fontSize: 11, color: "var(--c-muted)" }}>Scale</label>
-                <strong style={{ fontSize: 12, color: "var(--c-navy)" }}>
+              <div className="mb-1 flex justify-between">
+                <label className="text-xs text-on-surface-variant">Scale</label>
+                <strong className="text-xs text-on-surface">
                   {pct}%  →  {effW}x{effH}px
                 </strong>
               </div>
-              <input type="range" min={1} max={300} value={pct} onChange={(e) => setPct(+e.target.value)} style={{ width: "100%", accentColor: "var(--c-navy)" }} />
+              <input type="range" min={1} max={300} value={pct} onChange={(e) => setPct(+e.target.value)} className="w-full accent-primary" />
             </div>
           )}
-          <p style={{ fontSize: 11, color: "var(--c-muted)", marginTop: 8, marginBottom: 0 }}>
+          <p className="mb-0 mt-2 text-xs text-on-surface-variant">
             Original: {image.w}x{image.h}px · Max 3x: {image.w * 3}x{image.h * 3}px
           </p>
-          <div style={{ marginTop: 10 }}>
-            <img src={image.url} alt="Resize source" style={{ maxWidth: "100%", maxHeight: 180, borderRadius: 8, border: "1px solid var(--c-lb)" }} />
+          <div className="mt-2.5">
+            <img src={image.url} alt="Resize source" className="max-h-[180px] max-w-full rounded-lg border border-outline-variant/40" />
           </div>
         </Card>
 
-        <Card style={{ marginBottom: 14 }}>
-          <Sec>🎨 Format & Compression</Sec>
-          <div style={{ display: "flex", gap: 6, marginBottom: 12 }}>
+        <Card className="mb-3.5">
+          <SectionHeader>🎨 Format & Compression</SectionHeader>
+          <div className="mb-3 flex gap-1.5">
             {["JPG", "PNG", "WebP"].map((f) => (
               <Btn
                 key={f}
@@ -209,18 +178,34 @@ export default function ResizeStep({ image, onNext, onBack }) {
               </Btn>
             ))}
           </div>
-          <WarnBox msg={warn} />
+          <AlertBox msg={warn} variant="warn" />
+
+          <div className="mt-3.5">
+            <label className="mb-2 block text-xs text-on-surface-variant">Resize Mode</label>
+            <div className="flex gap-1.5">
+              {["stretch", "fit", "fill"].map((m) => (
+                <Btn key={m} onClick={() => setResizeMode(m)} variant={resizeMode === m ? "primary" : "ghost"} small>
+                  {m === "stretch" ? "Stretch" : m === "fit" ? "Fit" : "Fill"}
+                </Btn>
+              ))}
+            </div>
+            <p className="mt-1.5 text-[11px] text-on-surface-variant">
+              {resizeMode === "stretch" && "Stretch to exact dimensions (may distort)"}
+              {resizeMode === "fit" && "Scale proportionally to fit inside (may letterbox)"}
+              {resizeMode === "fill" && "Scale and center-crop to fill exactly"}
+            </p>
+          </div>
 
           {format === "JPG" && (
-            <div style={{ marginTop: 10 }}>
-              <label style={{ fontSize: 11, color: "var(--c-muted)", display: "block", marginBottom: 4 }}>JPG Background Fill</label>
-              <input type="color" value={jpgBackground} onChange={(e) => setJpgBackground(e.target.value)} style={{ width: 60, height: 34, border: "1px solid var(--c-lb)", borderRadius: 6, background: "var(--c-white)" }} />
+            <div className="mt-2.5">
+              <label className="mb-1 block text-xs text-on-surface-variant">JPG Background Fill</label>
+              <input type="color" value={jpgBackground} onChange={(e) => setJpgBackground(e.target.value)} className="h-[34px] w-[60px] rounded-md border border-outline-variant/40" />
             </div>
           )}
 
           {format !== "PNG" ? (
-            <div style={{ marginTop: 12 }}>
-              <div style={{ display: "flex", gap: 6, marginBottom: 10 }}>
+            <div className="mt-3">
+              <div className="mb-2.5 flex gap-1.5">
                 {["quality", "target"].map((m) => (
                   <Btn key={m} onClick={() => setSizeMode(m)} variant={sizeMode === m ? "primary" : "ghost"} small>
                     {m === "quality" ? "Quality %" : "Target Size"}
@@ -229,101 +214,87 @@ export default function ResizeStep({ image, onNext, onBack }) {
               </div>
               {sizeMode === "quality" ? (
                 <div>
-                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
-                    <label style={{ fontSize: 11, color: "var(--c-muted)" }}>Quality</label>
-                    <span style={{ fontSize: 12, fontWeight: 700, color: "var(--c-navy)" }}>{quality}%</span>
+                  <div className="mb-1 flex justify-between">
+                    <label className="text-xs text-on-surface-variant">Quality</label>
+                    <span className="text-xs font-bold text-on-surface">{quality}%</span>
                   </div>
-                  <input type="range" min={10} max={100} value={quality} onChange={(e) => setQuality(+e.target.value)} style={{ width: "100%", accentColor: "var(--c-navy)" }} />
-                  <div style={{ display: "flex", justifyContent: "space-between", marginTop: 5, fontSize: 11 }}>
-                    <span style={{ color: "var(--c-muted)" }}>Smaller file</span>
-                    <span style={{ color: "var(--c-muted)" }}>Approx. size ~{estKB} KB</span>
-                    <span style={{ color: "var(--c-muted)" }}>Better quality</span>
+                  <input type="range" min={10} max={100} value={quality} onChange={(e) => setQuality(+e.target.value)} className="w-full accent-primary" />
+                  <div className="mt-[5px] flex justify-between text-xs">
+                    <span className="text-on-surface-variant">Smaller file</span>
+                    <span className="text-on-surface-variant">Approx. size ~{estKB} KB</span>
+                    <span className="text-on-surface-variant">Better quality</span>
                   </div>
                 </div>
               ) : (
                 <div>
-                  <div style={{ display: "flex", gap: 6, marginBottom: 8, flexWrap: "wrap" }}>
+                  <div className="mb-2 flex flex-wrap gap-1.5">
                     {SIZE_PRESETS.map((p) => (
                       <Btn key={p.label} onClick={() => setTargetKB(p.target)} variant={targetKB === p.target ? "primary" : "ghost"} small>
                         {p.label} (&lt;{p.target}KB)
                       </Btn>
                     ))}
                   </div>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <label style={{ fontSize: 11, color: "var(--c-muted)" }}>Custom:</label>
-                    <input type="number" value={targetKB} onChange={(e) => setTargetKB(+e.target.value)} min={10} style={{ width: 70, padding: "6px 8px", border: "1px solid var(--c-blue)", borderRadius: 6, fontSize: 13 }} />
-                    <span style={{ fontSize: 11, color: "var(--c-muted)" }}>KB (±5% accuracy)</span>
+                  <div className="flex items-center gap-2">
+                    <label className="text-xs text-on-surface-variant">Custom:</label>
+                    <input type="number" value={targetKB} onChange={(e) => setTargetKB(+e.target.value)} min={10} className="w-[70px] rounded-md border border-primary px-2 py-1.5 text-[13px]" />
+                    <span className="text-xs text-on-surface-variant">KB (±5% accuracy)</span>
                   </div>
                 </div>
               )}
             </div>
           ) : (
-            <p style={{ fontSize: 12, color: "var(--c-muted)", marginTop: 8, marginBottom: 0 }}>PNG is always lossless.</p>
+            <p className="mb-0 mt-2 text-xs text-on-surface-variant">PNG is always lossless.</p>
           )}
         </Card>
 
-        <ErrBox msg={error} />
-        <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+        <AlertBox msg={error} />
+        <Card>
+          <label className="flex cursor-pointer items-center gap-2 text-sm text-on-surface">
+            <input
+              type="checkbox"
+              checked={stripExif}
+              onChange={(e) => setStripExif(e.target.checked)}
+            />
+            Strip EXIF metadata (recommended for privacy)
+          </label>
+        </Card>
+        <div className="mt-2.5 flex gap-2">
           <Btn onClick={onBack} variant="secondary">
-            ← Back
+            Back
           </Btn>
           <Btn
             onClick={() => {
-              if (validate()) onNext({ width: effW, height: effH, format, quality, sizeMode, targetKB, jpgBackground });
+              if (validate()) onNext({ width: effW, height: effH, format, quality, sizeMode, targetKB, jpgBackground, preserveExif: !stripExif, resizeMode });
             }}
-            style={{ flex: 1 }}
+            className="flex-1"
           >
             Next: Crop →
           </Btn>
         </div>
       </div>
 
-      <div style={{ background: "var(--c-bg)", border: "1px solid var(--c-lb)", borderRadius: 12, padding: 12, overflowY: "auto", maxHeight: 560 }}>
-        <p style={{ margin: "0 0 8px", fontSize: 10, fontWeight: 700, color: "var(--c-navy)", textTransform: "uppercase", letterSpacing: "0.06em" }}>Platform Presets</p>
+      <div className="max-h-[560px] overflow-y-auto rounded-xl border border-outline-variant/40 bg-surface p-3">
+        <p className="mb-2 mt-0 text-[10px] font-bold uppercase tracking-[0.06em] text-on-surface">Platform Presets</p>
         {Object.entries(PRESETS).map(([pl, list]) => (
-          <div key={pl} style={{ marginBottom: 2 }}>
+          <div key={pl} className="mb-0.5">
             <button
               onClick={() => setActivePlatform(activePlatform === pl ? null : pl)}
-              style={{
-                width: "100%",
-                textAlign: "left",
-                padding: "6px 8px",
-                background: activePlatform === pl ? "var(--c-lb)" : "transparent",
-                border: "none",
-                borderRadius: 6,
-                cursor: "pointer",
-                fontSize: 12,
-                fontWeight: 600,
-                color: "var(--c-navy)",
-                display: "flex",
-                justifyContent: "space-between",
-              }}
+              className={`flex w-full justify-between rounded-md border-none px-2 py-1.5 text-left text-xs font-semibold text-on-surface ${activePlatform === pl ? "bg-surface-container" : "bg-transparent"}`}
             >
               <span>
                 {ICONS[pl]} {pl}
               </span>
-              <span style={{ color: "var(--c-blue)", fontSize: 9 }}>{activePlatform === pl ? "▲" : "▼"}</span>
+              <span className="text-[9px] text-primary">{activePlatform === pl ? "▲" : "▼"}</span>
             </button>
             {activePlatform === pl &&
               list.map((p) => (
                 <button
                   key={p.name}
                   onClick={() => applyPreset(p)}
-                  style={{
-                    width: "100%",
-                    textAlign: "left",
-                    padding: "4px 8px 4px 18px",
-                    background: activePreset === p.name ? "var(--c-navy)" : "transparent",
-                    border: "none",
-                    borderRadius: 5,
-                    cursor: "pointer",
-                    fontSize: 11,
-                    color: activePreset === p.name ? "var(--c-white)" : "var(--c-text)",
-                    marginBottom: 1,
-                  }}
+                  className={`mb-px w-full rounded-[5px] border-none py-1 pl-[18px] pr-2 text-left text-xs ${activePreset === p.name ? "bg-primary text-on-primary" : "bg-transparent text-on-surface"}`}
                 >
-                  <div style={{ fontWeight: 500 }}>{p.name}</div>
-                  <div style={{ fontSize: 10, opacity: 0.65 }}>
+                  <div className="font-medium">{p.name}</div>
+                  <div className="text-[10px] opacity-65">
                     {p.w}x{p.h} · {p.fmt}
                   </div>
                 </button>

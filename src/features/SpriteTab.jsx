@@ -8,6 +8,7 @@ import SpriteCSSOutput from "../components/sprite/SpriteCSSOutput.jsx";
 import SpriteFileRow from "../components/sprite/SpriteFileRow.jsx";
 import { generateCssClass, packSprites } from "../utils/spriteUtils.js";
 import useDragToReorder from "../hooks/useDragToReorder.js";
+import { generateId } from "../utils/generateId.js";
 
 async function loadImageDimensions(file) {
   const url = URL.createObjectURL(file);
@@ -41,7 +42,7 @@ export default function SpriteTab({ onNotice }) {
     const next = [];
     for (const file of Array.from(list || [])) {
       const meta = await loadImageDimensions(file);
-      next.push({ id: `${Date.now()}-${Math.random()}`, file, name: file.name, ...meta });
+      next.push({ id: generateId(), file, name: file.name, ...meta });
     }
     setItems((current) => [...current, ...next]);
   };

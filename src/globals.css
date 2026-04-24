@@ -162,13 +162,13 @@
 .dark,
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --color-base-0: #18181c;
-  --color-base-50: #0a0a0b;
-  --color-base-100: #111113;
-  --color-base-150: #26262e;
+  --color-base-0: #1a1c22;
+  --color-base-50: #11141a;
+  --color-base-100: #151922;
+  --color-base-150: #202633;
   --color-base-200: rgba(255, 255, 255, 0.08);
   --color-base-300: rgba(255, 255, 255, 0.14);
-  --color-base-400: #6b6b78;
+  --color-base-400: #7b8798;
 
   --color-text-primary: #f2f2f5;
   --color-text-secondary: #a0a0ab;
@@ -200,11 +200,11 @@
   --color-outline: 90 90 106;
   --color-outline-variant: 70 70 84;
 
-  --bg-app: #0a0a0b;
-  --bg-panel: #111113;
-  --bg-card: #18181c;
-  --bg-elevated: #1e1e24;
-  --bg-hover: #26262e;
+  --bg-app: #11141a;
+  --bg-panel: #151922;
+  --bg-card: #1a1f29;
+  --bg-elevated: #212836;
+  --bg-hover: #273041;
   --bg-active: rgba(108, 99, 255, 0.12);
   --bg-input: #111113;
   --bg-overlay: rgba(0, 0, 0, 0.6);
@@ -244,6 +244,12 @@ body {
 
 * {
   @apply box-border;
+}
+
+button,
+[role="button"] {
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
 }
 
 .app-shell,
@@ -706,10 +712,727 @@ kbd {
   transition: var(--motion-panel);
 }
 
+/* Convert Tab Animations */
+@keyframes convert-spin { to { transform: rotate(360deg); } }
+@keyframes convert-pop { from { transform: scale(0.5); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+@keyframes convert-fade { from { transform: translateY(4px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+.convert-spin { animation: convert-spin 0.7s linear infinite; }
+.convert-pop { animation: convert-pop 0.2s ease; }
+.convert-fade { animation: convert-fade 0.25s ease; }
+
 /* Print Styles */
 @media print {
   body {
     @apply bg-white;
   }
+}
+
+/* ============================================================
+   UI Mode System
+   - classic: existing UI
+   - neo: redesigned visual language with rollback-safe scope
+   ============================================================ */
+
+.ui-neo {
+  --neo-bg: #0d1117;
+  --neo-bg-soft: #121924;
+  --neo-panel: #17202c;
+  --neo-surface: #1d2735;
+  --neo-stroke: #2c394a;
+  --neo-text: #edf2f7;
+  --neo-text-muted: #9fb0c6;
+  --neo-accent: #14b8a6;
+  --neo-accent-2: #0ea5e9;
+  --neo-accent-glow: rgba(20, 184, 166, 0.28);
+  --neo-warm: #f59e0b;
+}
+
+.ui-neo .app-body {
+  background:
+    radial-gradient(1200px 460px at 15% -12%, rgba(14, 165, 233, 0.16), transparent 55%),
+    radial-gradient(900px 420px at 90% 5%, rgba(20, 184, 166, 0.14), transparent 60%),
+    linear-gradient(180deg, #0d1117 0%, #0a0f16 100%);
+}
+
+.ui-neo .neo-topbar {
+  background: linear-gradient(180deg, rgba(18, 25, 36, 0.93), rgba(17, 24, 34, 0.9));
+  border-color: var(--neo-stroke);
+  backdrop-filter: blur(14px);
+}
+
+.ui-neo .neo-brand {
+  color: var(--neo-text);
+  letter-spacing: 0.01em;
+}
+
+.ui-neo .neo-logo-mark {
+  display: inline-flex;
+  height: 28px;
+  width: 28px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9px;
+  background: linear-gradient(135deg, rgba(14, 165, 233, 0.25), rgba(20, 184, 166, 0.2));
+  color: #7dd3fc;
+  box-shadow: inset 0 0 0 1px rgba(125, 211, 252, 0.24);
+}
+
+.ui-neo .neo-search {
+  border-color: var(--neo-stroke);
+  background: rgba(23, 32, 44, 0.76);
+  color: var(--neo-text-muted);
+  box-shadow: none;
+}
+
+.ui-neo .neo-search:hover {
+  border-color: #3b5169;
+  background: rgba(27, 37, 52, 0.95);
+}
+
+.ui-neo .neo-crumb-wrap {
+  border-color: var(--neo-stroke);
+}
+
+.ui-neo .ui-card {
+  background: linear-gradient(180deg, rgba(25, 34, 48, 0.92), rgba(21, 29, 41, 0.92));
+  border-color: var(--neo-stroke);
+  box-shadow: 0 14px 28px rgba(0, 0, 0, 0.22);
+}
+
+.ui-neo .ui-btn {
+  border-radius: 10px;
+}
+
+.ui-neo .ui-btn:hover {
+  filter: saturate(1.08);
+}
+
+.ui-neo .neo-tool-shell {
+  animation: fadeSlideIn 220ms ease-out;
+}
+
+.ui-neo .neo-hero {
+  position: relative;
+  border-color: var(--neo-stroke);
+  background:
+    radial-gradient(700px 250px at 100% 0%, rgba(14, 165, 233, 0.16), transparent 60%),
+    radial-gradient(620px 280px at 0% 100%, rgba(20, 184, 166, 0.18), transparent 58%),
+    linear-gradient(135deg, rgba(24, 34, 48, 0.95), rgba(16, 23, 33, 0.95));
+}
+
+.ui-neo .neo-hero .section-label,
+.ui-neo .neo-hero p,
+.ui-neo .neo-hero h1 {
+  color: var(--neo-text);
+}
+
+.ui-neo .neo-hero p {
+  color: var(--neo-text-muted);
+}
+
+.ui-neo .neo-quick-action {
+  border: 1px solid var(--neo-stroke);
+  border-radius: 12px;
+  background: rgba(21, 29, 41, 0.85);
+  color: var(--neo-text);
+  font-size: 13px;
+  font-weight: 600;
+  padding: 11px 14px;
+  text-align: left;
+  transition: all 180ms ease;
+}
+
+.ui-neo .neo-quick-action:hover {
+  border-color: rgba(20, 184, 166, 0.45);
+  background: rgba(23, 34, 46, 0.98);
+  box-shadow: 0 0 0 3px rgba(20, 184, 166, 0.14);
+}
+
+.ui-neo .neo-dropzone {
+  border-color: rgba(20, 184, 166, 0.44);
+  background: repeating-linear-gradient(
+    -45deg,
+    rgba(24, 35, 49, 0.72),
+    rgba(24, 35, 49, 0.72) 10px,
+    rgba(20, 31, 44, 0.76) 10px,
+    rgba(20, 31, 44, 0.76) 20px
+  );
+}
+
+.ui-neo .neo-tool-card {
+  transition: transform 180ms ease, border-color 180ms ease, box-shadow 180ms ease;
+}
+
+.ui-neo .neo-tool-card:hover {
+  border-color: rgba(14, 165, 233, 0.48);
+  box-shadow: 0 16px 32px rgba(2, 8, 23, 0.35);
+}
+
+.ui-neo .neo-tool-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  background: rgba(20, 184, 166, 0.09);
+  border: 1px solid rgba(20, 184, 166, 0.22);
+}
+
+.ui-neo .content-area p,
+.ui-neo .content-area span,
+.ui-neo .content-area label {
+  color: var(--neo-text-muted);
+}
+
+.ui-neo .content-area h1,
+.ui-neo .content-area h2,
+.ui-neo .content-area h3,
+.ui-neo .content-area h4,
+.ui-neo .content-area h5,
+.ui-neo .content-area h6 {
+  color: var(--neo-text);
+}
+
+.ui-neo input[type="text"],
+.ui-neo input[type="number"],
+.ui-neo input[type="email"],
+.ui-neo input[type="password"],
+.ui-neo textarea,
+.ui-neo select {
+  background: rgba(12, 18, 27, 0.85);
+  border-color: #2e3a49;
+  color: var(--neo-text);
+}
+
+.ui-neo input[type="text"]:focus,
+.ui-neo input[type="number"]:focus,
+.ui-neo input[type="email"]:focus,
+.ui-neo input[type="password"]:focus,
+.ui-neo textarea:focus,
+.ui-neo select:focus {
+  border-color: rgba(20, 184, 166, 0.75);
+  box-shadow: 0 0 0 3px rgba(20, 184, 166, 0.2);
+}
+
+.ui-neo .ui-badge {
+  border-color: #334155;
+  background: #1e293b;
+  color: #cbd5e1;
+}
+
+.ui-neo .ui-badge--accent {
+  border-color: rgba(20, 184, 166, 0.44);
+  background: rgba(20, 184, 166, 0.15);
+  color: #5eead4;
+}
+
+.editor-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 4px;
+  border-radius: 999px;
+  background: linear-gradient(
+    to right,
+    var(--color-accent-primary) 0%,
+    var(--color-accent-primary) var(--slider-pct, 50%),
+    var(--color-base-200) var(--slider-pct, 50%),
+    var(--color-base-200) 100%
+  );
+}
+
+.editor-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 999px;
+  border: 2px solid #fff;
+  background: var(--color-accent-primary);
+  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.22);
+}
+
+.editor-slider::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 999px;
+  border: 2px solid #fff;
+  background: var(--color-accent-primary);
+  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.22);
+}
+
+.ui-neo .editor-slider {
+  background: linear-gradient(
+    to right,
+    var(--neo-accent) 0%,
+    var(--neo-accent) var(--slider-pct, 50%),
+    #334155 var(--slider-pct, 50%),
+    #334155 100%
+  );
+}
+
+.ui-neo .editor-slider::-webkit-slider-thumb,
+.ui-neo .editor-slider::-moz-range-thumb {
+  border-color: #0b1220;
+  background: var(--neo-accent);
+  box-shadow: 0 0 0 3px rgba(20, 184, 166, 0.23);
+}
+
+@media (max-width: 768px) {
+  .ui-neo .neo-hero {
+    padding: 18px;
+  }
+}
+
+.mode-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px;
+  border-radius: 999px;
+  border: 1px solid var(--color-base-200);
+  background: var(--color-base-100);
+}
+
+.mode-switch-btn {
+  border: 0;
+  background: transparent;
+  color: var(--color-text-secondary);
+  border-radius: 999px;
+  padding: 5px 10px;
+  font-size: 12px;
+  line-height: 1;
+  font-weight: 600;
+  transition: background-color 180ms ease, color 180ms ease, transform 140ms ease;
+}
+
+.mode-switch-btn:hover {
+  color: var(--color-text-primary);
+}
+
+.mode-switch-btn.is-active {
+  background: var(--color-base-0);
+  color: var(--color-text-primary);
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.1);
+}
+
+/* ============================================================
+   Nova mode: immersive, expressive, rollback-safe
+   ============================================================ */
+
+.ui-nova {
+  --nova-bg-0: #05070d;
+  --nova-bg-1: #090d18;
+  --nova-bg-2: #10172a;
+  --nova-panel: rgba(15, 21, 37, 0.72);
+  --nova-panel-strong: rgba(18, 25, 42, 0.94);
+  --nova-stroke: rgba(150, 170, 210, 0.24);
+  --nova-text: #eef3ff;
+  --nova-text-muted: #a7b4ce;
+  --nova-accent: #22d3ee;
+  --nova-accent-2: #fb7185;
+  --nova-accent-3: #818cf8;
+  --nova-glow: rgba(34, 211, 238, 0.26);
+}
+
+.ui-nova,
+.ui-nova .content-area,
+.ui-nova .top-bar {
+  font-family: "Space Grotesk", "Manrope", "Segoe UI", sans-serif;
+}
+
+.ui-nova .app-body {
+  background:
+    radial-gradient(920px 480px at 8% -14%, rgba(34, 211, 238, 0.18), transparent 58%),
+    radial-gradient(900px 420px at 88% -8%, rgba(129, 140, 248, 0.2), transparent 52%),
+    radial-gradient(700px 380px at 70% 105%, rgba(251, 113, 133, 0.16), transparent 62%),
+    linear-gradient(160deg, var(--nova-bg-0) 0%, var(--nova-bg-1) 45%, var(--nova-bg-2) 100%);
+}
+
+.ui-nova .neo-topbar {
+  border-color: var(--nova-stroke);
+  background: linear-gradient(180deg, rgba(10, 15, 28, 0.88), rgba(8, 12, 24, 0.72));
+  backdrop-filter: blur(22px) saturate(120%);
+}
+
+.ui-nova .neo-brand {
+  color: var(--nova-text);
+  letter-spacing: 0.02em;
+}
+
+.ui-nova .neo-logo-mark {
+  background: linear-gradient(145deg, rgba(34, 211, 238, 0.28), rgba(129, 140, 248, 0.32));
+  color: #e0f2fe;
+  border-radius: 10px;
+  box-shadow: inset 0 0 0 1px rgba(224, 242, 254, 0.35), 0 8px 18px rgba(34, 211, 238, 0.22);
+}
+
+.ui-nova .neo-search {
+  border-color: var(--nova-stroke);
+  background: rgba(14, 20, 33, 0.72);
+  color: var(--nova-text-muted);
+}
+
+.ui-nova .neo-search:hover {
+  border-color: rgba(34, 211, 238, 0.4);
+  background: rgba(18, 25, 41, 0.92);
+}
+
+.ui-nova .mode-switch {
+  border-color: var(--nova-stroke);
+  background: rgba(12, 18, 30, 0.68);
+}
+
+.ui-nova .mode-switch-btn {
+  color: var(--nova-text-muted);
+}
+
+.ui-nova .mode-switch-btn:hover {
+  color: var(--nova-text);
+}
+
+.ui-nova .mode-switch-btn.is-active {
+  background: linear-gradient(135deg, rgba(34, 211, 238, 0.24), rgba(129, 140, 248, 0.24));
+  color: var(--nova-text);
+  box-shadow: inset 0 0 0 1px rgba(173, 216, 255, 0.24), 0 5px 10px rgba(6, 14, 26, 0.55);
+}
+
+.ui-nova .neo-crumb-wrap {
+  border-color: var(--nova-stroke);
+}
+
+.ui-nova .ui-card {
+  border-color: var(--nova-stroke);
+  background: linear-gradient(160deg, rgba(15, 21, 36, 0.92), rgba(14, 20, 35, 0.74));
+  box-shadow: 0 20px 40px rgba(2, 8, 23, 0.42);
+}
+
+.ui-nova .ui-btn {
+  border-radius: 12px;
+}
+
+.ui-nova .neo-tool-shell {
+  animation: nova-rise 320ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.ui-nova .neo-hero {
+  border-color: var(--nova-stroke);
+  background:
+    radial-gradient(600px 260px at 8% 0%, rgba(34, 211, 238, 0.22), transparent 58%),
+    radial-gradient(740px 300px at 100% 100%, rgba(129, 140, 248, 0.2), transparent 60%),
+    linear-gradient(145deg, rgba(16, 22, 40, 0.96), rgba(9, 14, 28, 0.96));
+}
+
+.ui-nova .neo-hero .section-label {
+  color: #67e8f9;
+  letter-spacing: 0.12em;
+}
+
+.ui-nova .neo-hero h1 {
+  color: var(--nova-text);
+  text-wrap: balance;
+}
+
+.ui-nova .neo-hero p,
+.ui-nova .content-area p,
+.ui-nova .content-area span,
+.ui-nova .content-area label {
+  color: var(--nova-text-muted);
+}
+
+.ui-nova .content-area h1,
+.ui-nova .content-area h2,
+.ui-nova .content-area h3,
+.ui-nova .content-area h4,
+.ui-nova .content-area h5,
+.ui-nova .content-area h6 {
+  color: var(--nova-text);
+}
+
+.ui-nova .nova-action-rail {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(180px, 1fr);
+  gap: 12px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  scroll-snap-type: x proximity;
+}
+
+.ui-nova .neo-quick-action {
+  border: 1px solid var(--nova-stroke);
+  border-radius: 14px;
+  background: linear-gradient(150deg, rgba(17, 24, 41, 0.88), rgba(13, 19, 34, 0.72));
+  color: var(--nova-text);
+  font-size: 13px;
+  font-weight: 600;
+  padding: 12px 14px;
+  text-align: left;
+  display: grid;
+  gap: 4px;
+  scroll-snap-align: start;
+  transition: transform 180ms ease, border-color 180ms ease, box-shadow 180ms ease;
+}
+
+.ui-nova .neo-quick-action small {
+  color: var(--nova-text-muted);
+  font-size: 11px;
+}
+
+.ui-nova .neo-quick-action:hover {
+  transform: translateY(-2px);
+  border-color: rgba(34, 211, 238, 0.45);
+  box-shadow: 0 12px 26px rgba(2, 12, 28, 0.44), 0 0 0 4px rgba(34, 211, 238, 0.12);
+}
+
+.ui-nova .neo-dropzone {
+  border-color: rgba(129, 140, 248, 0.5);
+  background:
+    linear-gradient(145deg, rgba(14, 21, 38, 0.78), rgba(11, 17, 31, 0.7)),
+    repeating-linear-gradient(-45deg, rgba(129, 140, 248, 0.08), rgba(129, 140, 248, 0.08) 8px, transparent 8px, transparent 16px);
+}
+
+.ui-nova .neo-tool-icon {
+  background: linear-gradient(140deg, rgba(34, 211, 238, 0.16), rgba(129, 140, 248, 0.16));
+  border: 1px solid rgba(129, 140, 248, 0.3);
+}
+
+.ui-nova .nova-tool-hit .neo-tool-card {
+  position: relative;
+  overflow: hidden;
+}
+
+.ui-nova .nova-tool-hit .neo-tool-card::after {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  opacity: 0;
+  background: radial-gradient(300px circle at var(--spot-x, 50%) var(--spot-y, 50%), rgba(34, 211, 238, 0.2), transparent 45%);
+  transition: opacity 180ms ease;
+  pointer-events: none;
+}
+
+.ui-nova .nova-tool-hit:hover .neo-tool-card {
+  border-color: rgba(34, 211, 238, 0.46);
+  transform: translateY(-2px);
+  box-shadow: 0 16px 30px rgba(2, 10, 25, 0.42);
+}
+
+.ui-nova .nova-tool-hit:hover .neo-tool-card::after {
+  opacity: 1;
+}
+
+.ui-nova input[type="text"],
+.ui-nova input[type="number"],
+.ui-nova input[type="email"],
+.ui-nova input[type="password"],
+.ui-nova textarea,
+.ui-nova select {
+  background: rgba(9, 14, 24, 0.86);
+  border-color: rgba(150, 170, 210, 0.32);
+  color: var(--nova-text);
+}
+
+.ui-nova input[type="text"]:focus,
+.ui-nova input[type="number"]:focus,
+.ui-nova input[type="email"]:focus,
+.ui-nova input[type="password"]:focus,
+.ui-nova textarea:focus,
+.ui-nova select:focus {
+  border-color: rgba(34, 211, 238, 0.74);
+  box-shadow: 0 0 0 3px rgba(34, 211, 238, 0.2);
+}
+
+.ui-nova .ui-badge {
+  border-color: rgba(150, 170, 210, 0.3);
+  background: rgba(14, 20, 34, 0.88);
+  color: #d6e1ff;
+}
+
+.ui-nova .ui-badge--accent {
+  border-color: rgba(34, 211, 238, 0.48);
+  background: rgba(34, 211, 238, 0.16);
+  color: #a5f3fc;
+}
+
+.ui-nova .editor-slider {
+  background: linear-gradient(to right, var(--nova-accent) 0%, var(--nova-accent) var(--slider-pct, 50%), #334155 var(--slider-pct, 50%), #334155 100%);
+}
+
+.ui-nova .editor-slider::-webkit-slider-thumb,
+.ui-nova .editor-slider::-moz-range-thumb {
+  border-color: #0d1324;
+  background: var(--nova-accent);
+  box-shadow: 0 0 0 3px rgba(34, 211, 238, 0.24);
+}
+
+@keyframes nova-rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.99);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@media (max-width: 768px) {
+  .mode-switch {
+    display: none;
+  }
+
+  .ui-nova .neo-hero {
+    padding: 18px;
+  }
+
+  .ui-nova .nova-action-rail {
+    grid-auto-columns: minmax(210px, 1fr);
+    touch-action: pan-x;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ui-nova .neo-tool-shell,
+  .ui-nova .neo-quick-action,
+  .ui-nova .nova-tool-hit .neo-tool-card {
+    animation: none;
+    transition: none;
+  }
+}
+
+/* ============================================================
+   Editor UX Polish (scoped)
+   ============================================================ */
+
+.editor-control-card {
+  border-color: color-mix(in srgb, var(--border-default) 86%, var(--color-accent-primary) 14%);
+}
+
+.editor-action-grid .ui-btn {
+  justify-content: center;
+}
+
+.editor-tool-btn {
+  box-shadow: 0 2px 4px rgba(15, 23, 42, 0.08);
+}
+
+.editor-slider-group {
+  border: 1px solid transparent;
+  background: color-mix(in srgb, var(--bg-elevated) 48%, transparent 52%);
+  transition: border-color 180ms ease, box-shadow 180ms ease, background-color 180ms ease;
+}
+
+.editor-slider-group.is-active {
+  border-color: color-mix(in srgb, var(--color-accent-primary) 45%, transparent 55%);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-accent-primary) 18%, transparent 82%);
+  background: color-mix(in srgb, var(--bg-elevated) 64%, transparent 36%);
+}
+
+.editor-slider-shell {
+  position: relative;
+}
+
+.editor-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 6px;
+  border-radius: 999px;
+  background:
+    linear-gradient(
+      to right,
+      color-mix(in srgb, var(--color-accent-primary) 85%, #ffffff 15%) 0%,
+      color-mix(in srgb, var(--color-accent-primary) 85%, #ffffff 15%) var(--slider-pct, 50%),
+      color-mix(in srgb, var(--color-base-300) 75%, transparent 25%) var(--slider-pct, 50%),
+      color-mix(in srgb, var(--color-base-300) 75%, transparent 25%) 100%
+    ),
+    var(--slider-visual, linear-gradient(90deg, rgba(148, 163, 184, 0.9), rgba(71, 85, 105, 0.9)));
+  transition: background 150ms linear, box-shadow 180ms ease;
+}
+
+.editor-slider.is-active {
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--color-accent-primary) 20%, transparent 80%);
+}
+
+.editor-slider::-webkit-slider-runnable-track {
+  height: 6px;
+  border-radius: 999px;
+}
+
+.editor-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  border: 2px solid #fff;
+  background: var(--color-accent-primary);
+  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.22), 0 3px 8px rgba(15, 23, 42, 0.22);
+  margin-top: -6px;
+  transition: transform 160ms ease, box-shadow 160ms ease;
+}
+
+.editor-slider.is-active::-webkit-slider-thumb,
+.editor-slider:active::-webkit-slider-thumb {
+  transform: scale(1.08);
+  box-shadow: 0 0 0 4px rgba(79, 70, 229, 0.26), 0 4px 10px rgba(15, 23, 42, 0.3);
+}
+
+.editor-slider::-moz-range-track {
+  height: 6px;
+  border-radius: 999px;
+}
+
+.editor-slider::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  border: 2px solid #fff;
+  background: var(--color-accent-primary);
+  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.22), 0 3px 8px rgba(15, 23, 42, 0.22);
+  transition: transform 160ms ease, box-shadow 160ms ease;
+}
+
+.editor-slider.is-active::-moz-range-thumb,
+.editor-slider:active::-moz-range-thumb {
+  transform: scale(1.08);
+  box-shadow: 0 0 0 4px rgba(79, 70, 229, 0.26), 0 4px 10px rgba(15, 23, 42, 0.3);
+}
+
+.editor-filter-chip {
+  min-width: 106px;
+  background: color-mix(in srgb, var(--bg-elevated) 72%, transparent 28%);
+  transition: transform 180ms ease, border-color 180ms ease, box-shadow 180ms ease, background-color 180ms ease;
+}
+
+.editor-filter-chip:hover {
+  transform: translateY(-1px);
+  border-color: color-mix(in srgb, var(--color-accent-primary) 36%, transparent 64%);
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.14);
+}
+
+.ui-neo .editor-slider,
+.ui-nova .editor-slider {
+  background:
+    linear-gradient(
+      to right,
+      color-mix(in srgb, var(--neo-accent, var(--nova-accent, var(--color-accent-primary))) 88%, #fff 12%) 0%,
+      color-mix(in srgb, var(--neo-accent, var(--nova-accent, var(--color-accent-primary))) 88%, #fff 12%) var(--slider-pct, 50%),
+      rgba(71, 85, 105, 0.72) var(--slider-pct, 50%),
+      rgba(71, 85, 105, 0.72) 100%
+    ),
+    var(--slider-visual, linear-gradient(90deg, rgba(148, 163, 184, 0.9), rgba(71, 85, 105, 0.9)));
+}
+
+.ui-neo .editor-slider::-webkit-slider-thumb,
+.ui-neo .editor-slider::-moz-range-thumb {
+  background: var(--neo-accent);
+  border-color: #0b1220;
+}
+
+.ui-nova .editor-slider::-webkit-slider-thumb,
+.ui-nova .editor-slider::-moz-range-thumb {
+  background: var(--nova-accent);
+  border-color: #0d1324;
 }
 

@@ -2,10 +2,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Btn from "../components/Btn.jsx";
 import Card from "../components/Card.jsx";
 import { num } from "../utils/imageUtils.js";
+import SectionHeader from "../components/SectionHeader.jsx";
 
-function Sec({ children, icon }) {
-  return <h3 className="text-lg font-headline font-bold text-on-surface mb-4 flex items-center gap-2">{icon && <span className="text-xl">{icon}</span>}{children}</h3>;
-}
 
 export default function CropStep({ image, onNext, onBack }) {
   const canvasRef = useRef(null);
@@ -17,6 +15,7 @@ export default function CropStep({ image, onNext, onBack }) {
   const [crop, setCrop] = useState({ x: 0, y: 0, w: image.w, h: image.h });
   const [dragging, setDragging] = useState(false);
   const [dragStart, setDragStart] = useState(null);
+  const [dragMode, setDragMode] = useState(null); // "new", "move", "nw", "ne", "sw", "se", "n", "s", "e", "w"
   const [history, setHistory] = useState([]);
   const RATIOS = [
     { l: "Free", v: "free" },
@@ -25,6 +24,7 @@ export default function CropStep({ image, onNext, onBack }) {
     { l: "16:9", v: 16 / 9 },
     { l: "3:2", v: 3 / 2 },
   ];
+  const HANDLE_SIZE = 10;
 
   useEffect(() => {
     imgRef.current.onload = () => {
@@ -53,6 +53,29 @@ export default function CropStep({ image, onNext, onBack }) {
       ctx.strokeStyle = "var(--c-blue)";
       ctx.lineWidth = 2;
       ctx.strokeRect(cx, cy, cw, ch);
+
+      // Draw resize handles
+      const handleRadius = 5;
+      const handles = {
+        nw: [cx, cy],
+        n: [cx + cw / 2, cy],
+        ne: [cx + cw, cy],
+        w: [cx, cy + ch / 2],
+        e: [cx + cw, cy + ch / 2],
+        sw: [cx, cy + ch],
+        s: [cx + cw / 2, cy + ch],
+        se: [cx + cw, cy + ch],
+      };
+
+      ctx.fillStyle = "white";
+      ctx.strokeStyle = "var(--c-blue)";
+      ctx.lineWidth = 1.5;
+      for (const [, [hx, hy]] of Object.entries(handles)) {
+        ctx.beginPath();
+        ctx.arc(hx, hy, handleRadius, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+      }
     }
   }, [imgLoaded, image.w, cropEnabled, crop]);
 
@@ -76,28 +99,91 @@ export default function CropStep({ image, onNext, onBack }) {
     };
   };
 
+  const getHitTarget = (x, y) => {
+    const { x: cx, y: cy, w, h } = crop;
+    const handles = {
+      nw: [cx, cy],
+      n: [cx + w / 2, cy],
+      ne: [cx + w, cy],
+      w: [cx, cy + h / 2],
+      e: [cx + w, cy + h / 2],
+      sw: [cx, cy + h],
+      s: [cx + w / 2, cy + h],
+      se: [cx + w, cy + h],
+    };
+    for (const [name, [hx, hy]] of Object.entries(handles)) {
+      if (Math.abs(x - hx) <= HANDLE_SIZE && Math.abs(y - hy) <= HANDLE_SIZE) return name;
+    }
+    if (x >= cx && x <= cx + w && y >= cy && y <= cy + h) return "move";
+    return "new";
+  };
+
   const beginDrag = (e) => {
     if (!cropEnabled) return;
+    e.target.setPointerCapture(e.pointerId);
     const pos = toImgCoords(e);
+    const mode = getHitTarget(pos.x, pos.y);
+    
     setHistory((h) => [...h, { ...crop }]);
     setDragging(true);
     setDragStart(pos);
-    setCrop({ x: Math.round(pos.x), y: Math.round(pos.y), w: 0, h: 0 });
+    setDragMode(mode);
+    
+    if (mode === "new") {
+      setCrop({ x: Math.round(pos.x), y: Math.round(pos.y), w: 0, h: 0 });
+    }
   };
 
   const moveDrag = (e) => {
-    if (!dragging || !dragStart) return;
+    if (!dragging || !dragStart || !dragMode) return;
     const pos = toImgCoords(e);
-    let x = Math.min(dragStart.x, pos.x);
-    let y = Math.min(dragStart.y, pos.y);
-    let w = Math.abs(pos.x - dragStart.x);
-    let h = Math.abs(pos.y - dragStart.y);
-    if (ratio !== "free" && w > 0) h = w / ratio;
-    x = Math.max(0, Math.min(x, image.w - w));
-    y = Math.max(0, Math.min(y, image.h - h));
-    w = Math.min(w, image.w - x);
-    h = Math.min(h, image.h - y);
-    setCrop({ x: Math.round(x), y: Math.round(y), w: Math.round(w), h: Math.round(h) });
+
+    if (dragMode === "new") {
+      // Drawing a new crop box
+      let x = Math.min(dragStart.x, pos.x);
+      let y = Math.min(dragStart.y, pos.y);
+      let w = Math.abs(pos.x - dragStart.x);
+      let h = Math.abs(pos.y - dragStart.y);
+      if (ratio !== "free" && w > 0) h = w / ratio;
+      x = Math.max(0, Math.min(x, image.w - w));
+      y = Math.max(0, Math.min(y, image.h - h));
+      w = Math.min(w, image.w - x);
+      h = Math.min(h, image.h - y);
+      setCrop({ x: Math.round(x), y: Math.round(y), w: Math.round(w), h: Math.round(h) });
+    } else if (dragMode === "move") {
+      // Moving the entire crop box
+      const dx = pos.x - dragStart.x;
+      const dy = pos.y - dragStart.y;
+      let newX = crop.x + dx;
+      let newY = crop.y + dy;
+      newX = Math.max(0, Math.min(newX, image.w - crop.w));
+      newY = Math.max(0, Math.min(newY, image.h - crop.h));
+      setCrop({ ...crop, x: Math.round(newX), y: Math.round(newY) });
+      setDragStart(pos);
+    } else {
+      // Resizing via handles
+      let newCrop = { ...crop };
+      const dx = pos.x - dragStart.x;
+      const dy = pos.y - dragStart.y;
+
+      if (dragMode.includes("n")) newCrop.y = Math.max(0, crop.y + dy);
+      if (dragMode.includes("s")) newCrop.h = Math.max(10, crop.h + dy);
+      if (dragMode.includes("w")) newCrop.x = Math.max(0, crop.x + dx);
+      if (dragMode.includes("e")) newCrop.w = Math.max(10, crop.w + dx);
+
+      // Apply aspect ratio lock if needed
+      if (ratio !== "free" && dragMode !== "w" && dragMode !== "e") {
+        newCrop.h = newCrop.w / ratio;
+      }
+
+      // Clamp to image boundaries
+      newCrop.x = Math.max(0, Math.min(newCrop.x, image.w - newCrop.w));
+      newCrop.y = Math.max(0, Math.min(newCrop.y, image.h - newCrop.h));
+      newCrop.w = Math.min(newCrop.w, image.w - newCrop.x);
+      newCrop.h = Math.min(newCrop.h, image.h - newCrop.y);
+
+      setCrop({ x: Math.round(newCrop.x), y: Math.round(newCrop.y), w: Math.round(newCrop.w), h: Math.round(newCrop.h) });
+    }
   };
 
   useEffect(() => {
@@ -138,16 +224,16 @@ export default function CropStep({ image, onNext, onBack }) {
 
   return (
     <div>
-      <Card style={{ marginBottom: 14 }}>
-        <Sec>✂️ Crop Tool</Sec>
-        <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 10, flexWrap: "wrap" }}>
-          <label style={{ display: "flex", alignItems: "center", gap: 5, cursor: "pointer", fontSize: 13, fontWeight: 600, color: "var(--c-navy)" }}>
+      <Card className="mb-3.5">
+        <SectionHeader>✂️ Crop Tool</SectionHeader>
+        <div className="mb-2.5 flex flex-wrap items-center gap-2">
+          <label className="flex cursor-pointer items-center gap-[5px] text-[13px] font-semibold text-on-surface">
             <input type="checkbox" checked={cropEnabled} onChange={(e) => setCropEnabled(e.target.checked)} />
             Enable Crop
           </label>
           {cropEnabled && (
             <>
-              <span style={{ color: "var(--c-lb)" }}>|</span>
+              <span className="text-outline-variant/40">|</span>
               {RATIOS.map((r) => (
                 <Btn key={r.l} onClick={() => setRatio(r.v)} variant={ratio === r.v ? "primary" : "ghost"} small>
                   {r.l}
@@ -183,41 +269,50 @@ export default function CropStep({ image, onNext, onBack }) {
           )}
         </div>
         {cropEnabled && (
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(120px,1fr))", gap: 8, marginBottom: 10 }}>
-            <label style={{ fontSize: 11, color: "var(--c-muted)" }}>
+          <div className="mb-2.5 grid grid-cols-[repeat(auto-fit,minmax(120px,1fr))] gap-2">
+            <label className="text-xs text-on-surface-variant">
               X
-              <input type="number" value={crop.x} min={0} max={image.w - 1} onChange={(e) => setCrop((c) => ({ ...c, x: Math.min(Math.max(0, num(e.target.value, 0)), image.w - c.w) }))} style={{ width: "100%", padding: "6px", border: "1px solid var(--c-lb)", borderRadius: 6 }} />
+              <input type="number" value={crop.x} min={0} max={image.w - 1} onChange={(e) => setCrop((c) => ({ ...c, x: Math.min(Math.max(0, num(e.target.value, 0)), image.w - c.w) }))} className="w-full rounded-md border border-outline-variant/40 p-1.5" />
             </label>
-            <label style={{ fontSize: 11, color: "var(--c-muted)" }}>
+            <label className="text-xs text-on-surface-variant">
               Y
-              <input type="number" value={crop.y} min={0} max={image.h - 1} onChange={(e) => setCrop((c) => ({ ...c, y: Math.min(Math.max(0, num(e.target.value, 0)), image.h - c.h) }))} style={{ width: "100%", padding: "6px", border: "1px solid var(--c-lb)", borderRadius: 6 }} />
+              <input type="number" value={crop.y} min={0} max={image.h - 1} onChange={(e) => setCrop((c) => ({ ...c, y: Math.min(Math.max(0, num(e.target.value, 0)), image.h - c.h) }))} className="w-full rounded-md border border-outline-variant/40 p-1.5" />
             </label>
-            <label style={{ fontSize: 11, color: "var(--c-muted)" }}>
+            <label className="text-xs text-on-surface-variant">
               Width
-              <input type="number" value={crop.w} min={1} max={image.w} onChange={(e) => setCrop((c) => ({ ...c, w: Math.min(Math.max(1, num(e.target.value, 1)), image.w - c.x) }))} style={{ width: "100%", padding: "6px", border: "1px solid var(--c-lb)", borderRadius: 6 }} />
+              <input type="number" value={crop.w} min={1} max={image.w} onChange={(e) => setCrop((c) => ({ ...c, w: Math.min(Math.max(1, num(e.target.value, 1)), image.w - c.x) }))} className="w-full rounded-md border border-outline-variant/40 p-1.5" />
             </label>
-            <label style={{ fontSize: 11, color: "var(--c-muted)" }}>
+            <label className="text-xs text-on-surface-variant">
               Height
-              <input type="number" value={crop.h} min={1} max={image.h} onChange={(e) => setCrop((c) => ({ ...c, h: Math.min(Math.max(1, num(e.target.value, 1)), image.h - c.y) }))} style={{ width: "100%", padding: "6px", border: "1px solid var(--c-lb)", borderRadius: 6 }} />
+              <input type="number" value={crop.h} min={1} max={image.h} onChange={(e) => setCrop((c) => ({ ...c, h: Math.min(Math.max(1, num(e.target.value, 1)), image.h - c.y) }))} className="w-full rounded-md border border-outline-variant/40 p-1.5" />
             </label>
           </div>
         )}
-        <div style={{ background: "var(--c-gray)", borderRadius: 8, overflow: "hidden", display: "flex", justifyContent: "center" }}>
+        <div className="flex justify-center overflow-hidden rounded-lg bg-surface-container">
           <canvas
             ref={canvasRef}
             width={Math.min(600, image.w)}
             height={Math.round(Math.min(600, image.w) * image.h / image.w)}
-            style={{ maxWidth: "100%", cursor: cropEnabled ? "crosshair" : "default", display: "block", touchAction: "none" }}
+            className={`block max-w-full ${cropEnabled ? "cursor-crosshair" : "cursor-default"}`}
+            style={{ touchAction: "none" }}
             onPointerDown={beginDrag}
             onPointerMove={moveDrag}
+            onPointerUp={() => {
+              setDragging(false);
+              setDragMode(null);
+            }}
+            onPointerCancel={() => {
+              setDragging(false);
+              setDragMode(null);
+            }}
           />
         </div>
       </Card>
-      <div style={{ display: "flex", gap: 8 }}>
+      <div className="flex gap-2">
         <Btn onClick={onBack} variant="secondary">
           ← Back
         </Btn>
-        <Btn onClick={() => onNext(cropEnabled && crop.w >= 10 && crop.h >= 10 ? crop : null)} disabled={cropEnabled && !validCrop && crop.w > 0} style={{ flex: 1 }}>
+        <Btn onClick={() => onNext(cropEnabled && crop.w >= 10 && crop.h >= 10 ? crop : null)} disabled={cropEnabled && !validCrop && crop.w > 0} className="flex-1">
           {cropEnabled && crop.w >= 10 ? "Apply Crop & Continue →" : "Skip Crop →"}
         </Btn>
       </div>

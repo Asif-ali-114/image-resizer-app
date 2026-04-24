@@ -3,6 +3,7 @@ import Btn from "./Btn.jsx";
 import Card from "./Card.jsx";
 import { fetchImageFromUrl } from "../utils/urlImportUtils.js";
 import { bytesToText } from "../utils/imageUtils.js";
+import { iconProps, ToolArrowDownIcon, ToolXIcon } from "./AppIcons.jsx";
 
 export default function UrlImportModal({ open, onClose, onAdd }) {
   const [value, setValue] = useState("");
@@ -61,11 +62,11 @@ export default function UrlImportModal({ open, onClose, onAdd }) {
   };
 
   return (
-    <div className="fixed inset-0 z-[90] bg-black/45 p-4" onClick={onClose}>
+    <div className="fixed inset-0 z-[90] bg-black/40 p-4 backdrop-blur-[2px]" onClick={onClose}>
       <Card className="mx-auto mt-8 w-full max-w-2xl" onClick={(e) => e.stopPropagation()}>
         <div className="mb-4 flex items-center justify-between">
           <h3 className="font-headline text-xl font-bold text-on-surface">Import Image from URL</h3>
-          <button type="button" onClick={onClose} aria-label="Close URL import" className="rounded-full p-1 hover:bg-surface-container">×</button>
+          <button type="button" onClick={onClose} aria-label="Close URL import" className="rounded-full p-1 hover:bg-surface-container"><ToolXIcon {...iconProps} size={16} /></button>
         </div>
 
         <label className="text-sm text-on-surface-variant">
@@ -106,7 +107,7 @@ export default function UrlImportModal({ open, onClose, onAdd }) {
                 }}
                 aria-label="Add preview image to queue"
               >
-                Add to Queue →
+                <span className="inline-flex items-center gap-2"><ToolArrowDownIcon {...iconProps} size={16} />Add to Queue</span>
               </Btn>
             </div>
           </div>

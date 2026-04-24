@@ -1,20 +1,21 @@
 import Btn from "./Btn.jsx";
+import { iconProps, ToolAlertIcon, ToolCheckIcon, ToolInfoIcon, ToolXIcon } from "./AppIcons.jsx";
 
 const TONE = {
   success: {
-    icon: "✓",
+    icon: ToolCheckIcon,
     border: "rgb(16 185 129)",
   },
   error: {
-    icon: "✗",
+    icon: ToolAlertIcon,
     border: "rgb(var(--color-error))",
   },
   info: {
-    icon: "ℹ",
+    icon: ToolInfoIcon,
     border: "rgb(var(--color-primary))",
   },
   warning: {
-    icon: "⚠",
+    icon: ToolAlertIcon,
     border: "rgb(245 158 11)",
   },
 };
@@ -35,7 +36,7 @@ export default function ToastContainer({ toasts, onRemove }) {
             role="status"
           >
             <div className="flex items-start gap-2">
-              <span className="mt-0.5 text-sm" aria-hidden="true">{tone.icon}</span>
+              <span className="mt-0.5 inline-flex h-6 w-6 items-center justify-center rounded-full bg-surface-container text-current" aria-hidden="true"><tone.icon {...iconProps} size={14} /></span>
               <div className="min-w-0 flex-1">
                 <p className="text-sm text-on-surface">{toast.message}</p>
                 {toast.action && (
@@ -54,7 +55,7 @@ export default function ToastContainer({ toasts, onRemove }) {
                 onClick={() => onRemove(toast.id)}
                 aria-label="Dismiss notification"
               >
-                ×
+                <ToolXIcon {...iconProps} size={14} />
               </Btn>
             </div>
           </div>

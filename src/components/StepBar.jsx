@@ -1,3 +1,5 @@
+import { iconProps, ToolCheckIcon } from "./AppIcons.jsx";
+
 export default function StepBar({ current, onGoStep }) {
   const steps = ["Upload", "Resize", "Crop", "Output"];
   return (
@@ -19,7 +21,7 @@ export default function StepBar({ current, onGoStep }) {
               }`}
               aria-label={`Step ${i + 1} ${s}`}
             >
-              {i < current ? "✓" : i + 1}
+              {i < current ? <ToolCheckIcon {...iconProps} size={14} /> : i + 1}
             </button>
             <span className={`text-xs font-medium whitespace-nowrap ${i === current ? "text-primary font-bold" : "text-on-surface-variant"}`}>
               {s}
